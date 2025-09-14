@@ -1,8 +1,8 @@
-# 🎯 SyncAI (Checkmate Spec Preview)
+# 🎯 SynxAI (Checkmate Spec Preview)
 
 **An AI-Powered Specification Analysis Tool with Real-Time External Data Integration**
 
-SyncAI (Checkmate Spec Preview) is a modern full-stack application that combines Next.js 15 frontend with a Python FastAPI backend, featuring multiple AI model integrations, real-time web search capabilities, cryptocurrency market data, and enhanced chat functionality. Inspired by Sync, this application provides a sleek, modern interface with advanced animations and comprehensive AI capabilities.
+SynxAI is a modern full-stack application that combines Next.js 15 frontend with a Python FastAPI backend, featuring multiple AI model integrations, real-time web search capabilities, cryptocurrency market data, and enhanced chat functionality. Inspired by Synx, this application provides a sleek, modern interface with advanced animations and comprehensive AI capabilities.
 
 ## 🏗️ Project Architecture
 
