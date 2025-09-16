@@ -5,6 +5,8 @@ import { Send, Sparkles, Globe, TrendingUp, User, Mic, Plus, Settings, MoreHoriz
 import { useDarkMode } from '@/hooks';
 import { AnimatedThemeToggler, VoiceThemeNotification, AuroraText, SearchToolsDropdown } from "@/components/magicui";
 import { AIModelDropdown } from "@/components/magicui/ai-model-dropdown";
+import { chatAPI } from '@/lib/api';
+import { testEnhancedBackend, testStreamingChat } from '@/lib/test-enhanced-api';
 
 // Type definitions for SpeechRecognition API
 interface SpeechRecognitionEvent extends Event {
@@ -85,13 +87,7 @@ export default function Home() {
   const [selectedModel, setSelectedModel] = useState('openai/gpt-oss-120b');
   const [showWelcome, setShowWelcome] = useState(true);
   const [selectedTool, setSelectedTool] = useState<string | null>(null);
-  const [availableModels, setAvailableModels] = useState<AIModel[]>([
-    { id: 'openai/gpt-oss-120b', name: 'GPT-OSS-120B', provider: 'OpenAI', description: 'Open source 120B parameter model' },
-    { id: 'meta-llama/llama-4-maverick-17b-128e-instruct', name: 'Llama-4 Maverick 17B', provider: 'Meta', description: '17B parameter model with 128 experts' },
-    { id: 'deepseek-r1-distill-llama-70b', name: 'DeepSeek R1 Distill Llama 70B', provider: 'DeepSeek', description: 'Distilled version of DeepSeek R1 with 70B parameters' },
-    { id: 'qwen/qwen3-32b', name: 'Qwen3 32B', provider: 'Qwen', description: 'Latest Qwen model with 32B parameters' },
-    { id: 'moonshotai/kimi-k2-instruct', name: 'Kimi K2 Instruct', provider: 'Moonshot AI', description: 'Kimi K2 instruction-following model' }
-  ]);
+  const [availableModels, setAvailableModels] = useState<AIModel[]>([]);
   const [lastClickTime, setLastClickTime] = useState<number>(0);
   const [lastClickedPrompt, setLastClickedPrompt] = useState<string>('');
   
@@ -134,21 +130,82 @@ export default function Home() {
     };
 
     setMessages(prev => [...prev, userMessage]);
+    const messageContent = inputText;
     setInputText('');
     setIsLoading(true);
 
-    // Simulate AI response (replace with actual API call)
-    setTimeout(() => {
-      const aiMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        content: `I received your message: "${userMessage.content}". This is a mock response. In the full implementation, I would process this through the selected AI model (${selectedModel}) and provide intelligent responses with access to real-time web search and crypto data.`,
-        role: 'assistant',
-        timestamp: new Date(),
-        model: selectedModel
-      };
-      setMessages(prev => [...prev, aiMessage]);
+    // Create AI response message that will be updated with streaming content
+    const aiMessageId = (Date.now() + 1).toString();
+    const aiMessage: Message = {
+      id: aiMessageId,
+      content: '',
+      role: 'assistant',
+      timestamp: new Date(),
+      model: selectedModel
+    };
+
+    setMessages(prev => [...prev, aiMessage]);
+
+    try {
+      // Use enhanced chat API with streaming
+      const conversationId = 'default-conversation'; // In production, this would be managed properly
+      
+      await chatAPI.streamChat(
+        conversationId,
+        messageContent,
+        selectedModel,
+        // onChunk - update the AI message content as chunks arrive
+        (chunk: string) => {
+          setMessages(prev => prev.map(msg => 
+            msg.id === aiMessageId 
+              ? { ...msg, content: msg.content + chunk }
+              : msg
+          ));
+        },
+        // onComplete - finalize the response
+        (data: unknown) => {
+          console.log('Enhanced chat stream completed:', data);
+          setIsLoading(false);
+        },
+        // onError - handle errors
+        (error: string) => {
+          console.error('Enhanced chat stream error:', error);
+          setMessages(prev => prev.map(msg => 
+            msg.id === aiMessageId 
+              ? { 
+                  ...msg, 
+                  content: msg.content || `Error: ${error}. This might be because the enhanced backend is not running or API keys are not configured. Please check the backend service and ensure it's running on the correct port.`
+                }
+              : msg
+          ));
+          setIsLoading(false);
+        }
+      );
+    } catch (error) {
+      console.error('Failed to send message to enhanced backend:', error);
+      
+      // Enhanced fallback response with more context
+      const fallbackContent = `I received your message: "${messageContent}". 
+
+The enhanced backend appears to be unavailable. Here's what I would do with full backend integration:
+
+🤖 **AI Model**: Process through ${selectedModel} (${availableModels.find(m => m.id === selectedModel)?.name || 'Selected Model'})
+🔍 **Search Tools**: ${selectedTool ? `Use ${selectedTool} for real-time data` : 'Intelligent context detection for web search, crypto data, or news'}
+⚡ **Enhanced Features**: Real-time streaming, conversation history, vector search, and intelligent fallback handling
+
+Please ensure the enhanced backend service is running on http://localhost:8000 and properly configured with API keys for:
+- Groq API (for AI models)
+- SerpAPI (for web/news search)  
+- Binance API (for crypto data)
+- PostgreSQL with pgvector (for knowledge search)`;
+
+      setMessages(prev => prev.map(msg => 
+        msg.id === aiMessageId 
+          ? { ...msg, content: fallbackContent }
+          : msg
+      ));
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -180,17 +237,21 @@ export default function Home() {
   }, []);
   
   const handleToolSelect = (toolId: string) => {
-    if (toolId === 'web') {
-      setInputText('Search the web for latest information');
-      setSelectedTool('web');
+    if (toolId === 'web_search') {
+      setInputText('Search the web for latest information about ');
+      setSelectedTool('web_search');
       inputRef.current?.focus();
-    } else if (toolId === 'crypto') {
-      setInputText('Get current cryptocurrency market data');
-      setSelectedTool('crypto');
+    } else if (toolId === 'news_search') {
+      setInputText('Search for latest news about ');
+      setSelectedTool('news_search');
       inputRef.current?.focus();
-    } else if (toolId === 'ai') {
-      setInputText('');
-      setSelectedTool('ai');
+    } else if (toolId === 'crypto_data') {
+      setInputText('Get current cryptocurrency market data for ');
+      setSelectedTool('crypto_data');
+      inputRef.current?.focus();
+    } else if (toolId === 'vector_search') {
+      setInputText('Search knowledge base for ');
+      setSelectedTool('vector_search');
       inputRef.current?.focus();
     }
   };
@@ -226,6 +287,28 @@ export default function Home() {
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
+
+  // Fetch available models from enhanced backend
+  useEffect(() => {
+    const fetchModels = async () => {
+      try {
+        const response = await chatAPI.getModels();
+        setAvailableModels(response.models || []);
+        
+        // Set default model if none selected and models are available
+        if (!selectedModel && response.models && response.models.length > 0) {
+          const recommendedModel = response.models.find(m => m.recommended);
+          const defaultModel = recommendedModel || response.models[0];
+          setSelectedModel(defaultModel.id);
+        }
+      } catch (error) {
+        console.error('Failed to fetch models:', error);
+        // Keep empty array as fallback - the AIModelDropdown will handle this
+      }
+    };
+
+    fetchModels();
+  }, [selectedModel]);
 
   // Initialize SpeechRecognition API
   useEffect(() => {
@@ -503,17 +586,19 @@ export default function Home() {
         
         // Don't set isListening to false here as it might be starting
         let errorMessage = 'Error starting speech recognition';
-        if (error.name === 'NotAllowedError') {
-          errorMessage = 'Microphone access denied. Please allow microphone access in your browser settings.';
-        } else if (error.name === 'NotFoundError') {
-          errorMessage = 'No microphone found. Please connect a microphone and try again.';
-        } else if (error.name === 'InvalidStateError') {
-          // This is the error we're trying to fix - recognition is already started
-          errorMessage = ''; // Don't show error message for this case
-          // The recognition is already running, so update the state to reflect that
-          setIsListening(true);
-        } else if (error.message) {
-          errorMessage = error.message;
+        if (error instanceof Error) {
+          if (error.name === 'NotAllowedError') {
+            errorMessage = 'Microphone access denied. Please allow microphone access in your browser settings.';
+          } else if (error.name === 'NotFoundError') {
+            errorMessage = 'No microphone found. Please connect a microphone and try again.';
+          } else if (error.name === 'InvalidStateError') {
+            // This is the error we're trying to fix - recognition is already started
+            errorMessage = ''; // Don't show error message for this case
+            // The recognition is already running, so update the state to reflect that
+            setIsListening(true);
+          } else if (error.message) {
+            errorMessage = error.message;
+          }
         }
         
         if (errorMessage) {
@@ -661,6 +746,19 @@ export default function Home() {
                   <span className="text-sm font-medium">𝕏</span>
                 </div>
                 <div className="flex items-center space-x-1">
+                {/* Development test button - remove in production */}
+                <button 
+                  className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors flex items-center justify-center text-xs"
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    console.log('Testing enhanced backend...');
+                    await testEnhancedBackend();
+                    await testStreamingChat();
+                  }}
+                  title="Test Enhanced Backend"
+                >
+                  🧪
+                </button>
                 <AnimatedThemeToggler 
                   isDarkMode={isDarkMode}
                   toggleDarkMode={toggleDarkMode}
@@ -947,7 +1045,7 @@ export default function Home() {
                     <Zap className="h-10 w-10 text-white mx-auto" />
                   </div>
                   <h1 className="text-4xl font-bold mb-4">
-                    <AuroraText>Hey there, I&apos;m Sync!</AuroraText>
+                    <AuroraText>Hey there, I&apos;m Synx!</AuroraText>
                   </h1>
                   <p className="text-lg text-gray-600 dark:text-gray-400 mb-8 animate-fade-in">
                     How can I help you?

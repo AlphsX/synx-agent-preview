@@ -15,6 +15,9 @@ apiClient.interceptors.request.use((config) => {
   const token = localStorage.getItem('access_token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
+  } else {
+    // Use demo token for development/testing
+    config.headers.Authorization = `Bearer demo-token`;
   }
   return config;
 });
@@ -97,35 +100,142 @@ export const authAPI = {
   }
 };
 
-// Chat API
+// Enhanced Chat API
 export const chatAPI = {
   getConversations: async (): Promise<Conversation[]> => {
-    const response = await apiClient.get('/api/chat/conversations');
-    return response.data;
+    try {
+      const response = await apiClient.get('/api/chat/conversations');
+      return response.data;
+    } catch (error) {
+      console.warn('Enhanced chat conversations endpoint not available:', error);
+      return [];
+    }
   },
 
   createConversation: async (title: string): Promise<Conversation> => {
-    const response = await apiClient.post('/api/chat/conversations', { title });
-    return response.data;
+    try {
+      const response = await apiClient.post('/api/chat/conversations', { title });
+      return response.data;
+    } catch (error) {
+      console.warn('Enhanced chat create conversation endpoint not available:', error);
+      throw error;
+    }
   },
 
-  getModels: async (): Promise<{ models: AIModel[]; external_apis: Record<string, string> }> => {
-    const response = await apiClient.get('/api/chat/models');
-    return response.data;
+  getModels: async (): Promise<{ models: AIModel[]; total_models: number; providers: string[]; enhanced_features: string[] }> => {
+    try {
+      const response = await apiClient.get('/api/chat/models');
+      return response.data;
+    } catch (error) {
+      console.warn('Enhanced chat models endpoint not available:', error);
+      // Return fallback models
+      const fallbackModels: AIModel[] = [
+        { id: 'openai/gpt-oss-120b', name: 'GPT OSS 120B', provider: 'Groq', description: 'OpenAI\'s GPT OSS 120B model for advanced reasoning', recommended: true },
+        { id: 'meta-llama/llama-4-maverick-17b-128e-instruct', name: 'Llama 4 Maverick 17B', provider: 'Groq', description: 'Meta\'s Llama 4 Maverick 17B instruction-tuned model' },
+        { id: 'deepseek-r1-distill-llama-70b', name: 'DeepSeek R1 Distill Llama 70B', provider: 'Groq', description: 'DeepSeek\'s R1 distilled Llama 70B model' },
+        { id: 'qwen/qwen3-32b', name: 'Qwen 3 32B', provider: 'Groq', description: 'Alibaba\'s Qwen 3 32B model for multilingual tasks' },
+        { id: 'moonshotai/kimi-k2-instruct-0905', name: 'Kimi K2 Instruct', provider: 'Groq', description: 'MoonshotAI\'s Kimi K2 instruction-tuned model' }
+      ];
+      return {
+        models: fallbackModels,
+        total_models: fallbackModels.length,
+        providers: ['Groq'],
+        enhanced_features: ['real_time_web_search', 'cryptocurrency_data', 'news_updates', 'vector_knowledge_search']
+      };
+    }
   },
 
   getChatCapabilities: async (): Promise<{
     features: string[];
     models_available: number;
+    ai_providers: number;
+    search_providers: number;
     external_apis: number;
     real_time_data: boolean;
     streaming: boolean;
+    caching: boolean;
+    fallback_support: boolean;
   }> => {
-    const response = await apiClient.get('/api/chat/capabilities');
-    return response.data;
+    try {
+      const response = await apiClient.get('/api/chat/capabilities');
+      return response.data;
+    } catch (error) {
+      console.warn('Enhanced chat capabilities endpoint not available:', error);
+      return {
+        features: ['Multi-AI model support', 'Real-time web search', 'Cryptocurrency data', 'News updates', 'Vector search'],
+        models_available: 5,
+        ai_providers: 1,
+        search_providers: 2,
+        external_apis: 3,
+        real_time_data: true,
+        streaming: true,
+        caching: true,
+        fallback_support: true
+      };
+    }
   },
 
-  // Streaming chat with Server-Sent Events
+  getSearchTools: async (): Promise<{
+    tools: Array<{
+      id: string;
+      name: string;
+      description: string;
+      providers: string[];
+      primary_provider: string;
+      available: boolean;
+    }>;
+    search_providers_status: Record<string, unknown>;
+    intelligent_routing: boolean;
+    fallback_support: boolean;
+  }> => {
+    try {
+      const response = await apiClient.get('/api/chat/search-tools');
+      return response.data;
+    } catch (error) {
+      console.warn('Enhanced chat search tools endpoint not available:', error);
+      return {
+        tools: [
+          { id: 'web_search', name: 'Web Search', description: 'Search the web for current information', providers: ['SerpAPI', 'Brave Search'], primary_provider: 'SerpAPI', available: true },
+          { id: 'news_search', name: 'News Search', description: 'Search for latest news and current events', providers: ['SerpAPI', 'Brave Search'], primary_provider: 'SerpAPI', available: true },
+          { id: 'crypto_data', name: 'Cryptocurrency Data', description: 'Get real-time cryptocurrency market data', providers: ['Binance'], primary_provider: 'Binance', available: true },
+          { id: 'vector_search', name: 'Knowledge Search', description: 'Search domain-specific knowledge base', providers: ['Vector Database'], primary_provider: 'PostgreSQL + pgvector', available: true }
+        ],
+        search_providers_status: {},
+        intelligent_routing: true,
+        fallback_support: true
+      };
+    }
+  },
+
+  getServiceStatus: async (): Promise<{
+    service: string;
+    status: string;
+    timestamp: string;
+    services: Record<string, unknown>;
+    active_connections: number;
+    features: Record<string, string>;
+  }> => {
+    try {
+      const response = await apiClient.get('/api/chat/status');
+      return response.data;
+    } catch (error) {
+      console.warn('Enhanced chat status endpoint not available:', error);
+      return {
+        service: 'Enhanced Chat Service',
+        status: 'demo_mode',
+        timestamp: new Date().toISOString(),
+        services: {},
+        active_connections: 0,
+        features: {
+          'ai_models': 'Demo mode - configure API keys',
+          'web_search': 'Demo mode - configure SerpAPI',
+          'crypto_data': 'Demo mode - configure Binance API'
+        }
+      };
+    }
+  },
+
+  // Enhanced streaming chat with Server-Sent Events
   streamChat: async (
     conversationId: string,
     message: string,
@@ -139,7 +249,7 @@ export const chatAPI = {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+          'Authorization': `Bearer ${localStorage.getItem('access_token') || 'demo-token'}`,
         },
         body: JSON.stringify({
           content: message,
@@ -159,36 +269,116 @@ export const chatAPI = {
         throw new Error('No response body reader available');
       }
 
+      let buffer = '';
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n');
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || ''; // Keep incomplete line in buffer
 
         for (const line of lines) {
           if (line.startsWith('data: ')) {
+            const dataStr = line.slice(6).trim();
+            if (dataStr === '[DONE]') {
+              onComplete({ type: 'done' });
+              return;
+            }
+            
             try {
-              const data = JSON.parse(line.slice(6));
+              const data = JSON.parse(dataStr);
               
-              if (data.type === 'content') {
-                onChunk(data.content);
+              if (data.type === 'content' || data.content) {
+                onChunk(data.content || data.text || '');
               } else if (data.type === 'done') {
                 onComplete(data);
                 return;
               } else if (data.type === 'error') {
-                onError(data.content);
+                onError(data.content || data.message || 'Stream error');
                 return;
               }
-            } catch (e) {
-              console.warn('Failed to parse SSE data:', line);
+            } catch (parseError) {
+              // If it's not JSON, treat as plain text content
+              if (dataStr && dataStr !== '[DONE]') {
+                onChunk(dataStr);
+              }
             }
           }
         }
       }
+      
+      // Handle any remaining buffer content
+      if (buffer.trim()) {
+        onComplete({ type: 'done' });
+      }
     } catch (error) {
       onError(error instanceof Error ? error.message : 'Unknown error occurred');
     }
+  },
+
+  // WebSocket streaming alternative
+  connectWebSocket: (
+    conversationId: string,
+    onMessage: (data: Record<string, unknown>) => void,
+    onError: (error: string) => void,
+    onClose: () => void
+  ): WebSocket => {
+    const wsUrl = `${API_BASE_URL.replace('http', 'ws')}/api/chat/ws/${conversationId}`;
+    const ws = new WebSocket(wsUrl);
+
+    ws.onopen = () => {
+      console.log('Enhanced WebSocket connected');
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        onMessage(data);
+      } catch {
+        console.warn('Failed to parse WebSocket message:', event.data);
+        // Handle plain text messages
+        onMessage({ type: 'content', content: event.data });
+      }
+    };
+
+    ws.onerror = (error) => {
+      console.error('WebSocket error:', error);
+      onError('WebSocket connection error');
+    };
+
+    ws.onclose = () => {
+      console.log('Enhanced WebSocket disconnected');
+      onClose();
+    };
+
+    return ws;
+  },
+
+  // Search endpoints
+  searchWeb: async (query: string, count: number = 10, provider?: string) => {
+    const params = new URLSearchParams({ query, count: count.toString() });
+    if (provider) params.append('provider', provider);
+    
+    const response = await apiClient.post(`/api/chat/search/web?${params}`);
+    return response.data;
+  },
+
+  searchNews: async (query: string, count: number = 5, timePeriod: string = '1d', provider?: string) => {
+    const params = new URLSearchParams({ 
+      query, 
+      count: count.toString(),
+      time_period: timePeriod
+    });
+    if (provider) params.append('provider', provider);
+    
+    const response = await apiClient.post(`/api/chat/search/news?${params}`);
+    return response.data;
+  },
+
+  getCryptoMarket: async () => {
+    const response = await apiClient.get('/api/chat/crypto/market');
+    return response.data;
   }
 };
 

@@ -8,16 +8,18 @@ export default function TestThemePage() {
 
   // Log system preference changes for testing
   useEffect(() => {
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const logSystemPreference = (e: MediaQueryListEvent) => {
-      console.log('System preference changed:', e.matches ? 'dark' : 'light');
-    };
-    
-    mediaQuery.addEventListener('change', logSystemPreference);
-    
-    return () => {
-      mediaQuery.removeEventListener('change', logSystemPreference);
-    };
+    if (typeof window !== 'undefined') {
+      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+      const logSystemPreference = (e: MediaQueryListEvent) => {
+        console.log('System preference changed:', e.matches ? 'dark' : 'light');
+      };
+      
+      mediaQuery.addEventListener('change', logSystemPreference);
+      
+      return () => {
+        mediaQuery.removeEventListener('change', logSystemPreference);
+      };
+    }
   }, []);
 
   return (
@@ -28,7 +30,7 @@ export default function TestThemePage() {
         <h2 className="text-xl font-semibold mb-4">Current Theme Status</h2>
         <p className="text-lg mb-2">Dark Mode: <span className="font-mono">{isDarkMode ? 'enabled' : 'disabled'}</span></p>
         <p className="text-lg">System Preference: <span className="font-mono">
-          {window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'}
+          {typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'}
         </span></p>
       </div>
       

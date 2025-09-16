@@ -9,21 +9,23 @@ export default function TestSystemTheme() {
 
   // Track system preference changes
   useEffect(() => {
-    const updateSystemPreference = () => {
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      setSystemPreference(prefersDark ? 'dark' : 'light');
-    };
+    if (typeof window !== 'undefined') {
+      const updateSystemPreference = () => {
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        setSystemPreference(prefersDark ? 'dark' : 'light');
+      };
 
-    // Initial check
-    updateSystemPreference();
+      // Initial check
+      updateSystemPreference();
 
-    // Listen for changes
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    mediaQuery.addEventListener('change', updateSystemPreference);
+      // Listen for changes
+      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+      mediaQuery.addEventListener('change', updateSystemPreference);
 
-    return () => {
-      mediaQuery.removeEventListener('change', updateSystemPreference);
-    };
+      return () => {
+        mediaQuery.removeEventListener('change', updateSystemPreference);
+      };
+    }
   }, []);
 
   return (
@@ -52,7 +54,7 @@ export default function TestSystemTheme() {
             <div className="flex justify-between items-center">
               <span>Following System:</span>
               <span className="font-mono px-2 py-1 bg-yellow-100 dark:bg-yellow-900 rounded">
-                {localStorage.getItem('theme') ? 'No' : 'Yes'}
+                {typeof window !== 'undefined' && localStorage.getItem('theme') ? 'No' : 'Yes'}
               </span>
             </div>
           </div>

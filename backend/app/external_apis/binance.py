@@ -159,3 +159,11 @@ class BinanceService:
         
         except Exception as e:
             return {"error": f"Error fetching account info: {str(e)}"}
+    
+    def is_available(self) -> bool:
+        """Check if Binance service is available (doesn't require API keys for public endpoints)"""
+        return True  # Public endpoints are always available
+    
+    def has_credentials(self) -> bool:
+        """Check if API credentials are configured"""
+        return bool(self.api_key and self.secret_key)

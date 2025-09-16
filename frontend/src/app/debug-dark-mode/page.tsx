@@ -15,7 +15,7 @@ export default function DebugDarkMode() {
         Current mode: {isDarkMode ? 'Dark' : 'Light'}
       </p>
       <p className="text-gray-700 dark:text-gray-300 mb-4">
-        Document has dark class: {document.documentElement.classList.contains('dark') ? 'Yes' : 'No'}
+        Document has dark class: {typeof document !== 'undefined' && document.documentElement.classList.contains('dark') ? 'Yes' : 'No'}
       </p>
       
       <div className="flex items-center space-x-4 mb-6">

@@ -9,7 +9,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Sync AI",
+  title: "Synx AI",
   description: "Nothin' SpecialX~。",
 };
 
