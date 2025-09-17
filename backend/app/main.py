@@ -43,10 +43,93 @@ async def lifespan(app: FastAPI):
     await close_database()
 
 app = FastAPI(
-    title="Checkmate Spec Preview API",
-    description="Backend API for Checkmate Spec Preview - AI Agent inspired by Sync",
+    title="AI Agent Backend API",
+    description="""
+    ## AI Agent Backend Integration API
+    
+    A comprehensive backend system that integrates multiple AI models, external APIs, and vector database capabilities 
+    for building intelligent conversational agents.
+    
+    ### Key Features
+    - **Multi-AI Provider Support**: Groq, OpenAI, Anthropic with intelligent routing
+    - **Real-time Data Integration**: Web search (SerpAPI/Brave), cryptocurrency data (Binance)
+    - **Vector Database**: Semantic search with PostgreSQL + pgvector
+    - **Streaming Responses**: WebSocket and Server-Sent Events support
+    - **Conversation Management**: Persistent chat history with Redis caching
+    - **Production Ready**: Docker deployment, monitoring, and error handling
+    
+    ### External Integrations
+    - **Search**: SerpAPI (primary), Brave Search (fallback)
+    - **AI Models**: Groq, OpenAI, Anthropic
+    - **Crypto Data**: Binance API
+    - **Database**: PostgreSQL with pgvector extension
+    - **Caching**: Redis for conversation history
+    
+    ### Authentication
+    JWT-based authentication for protected endpoints. Include `Authorization: Bearer <token>` header.
+    
+    ### Rate Limiting
+    API endpoints are rate-limited to prevent abuse:
+    - General API: 10 requests/second
+    - WebSocket: 5 connections/second
+    
+    ### Error Handling
+    All endpoints return structured error responses with fallback options when available.
+    """,
     version="1.0.0",
-    lifespan=lifespan
+    lifespan=lifespan,
+    contact={
+        "name": "AI Agent API Support",
+        "email": "support@example.com",
+    },
+    license_info={
+        "name": "MIT License",
+        "url": "https://opensource.org/licenses/MIT",
+    },
+    servers=[
+        {
+            "url": "http://localhost:8000",
+            "description": "Development server"
+        },
+        {
+            "url": "https://api.yourdomain.com",
+            "description": "Production server"
+        }
+    ],
+    openapi_tags=[
+        {
+            "name": "health",
+            "description": "Health check and system status endpoints"
+        },
+        {
+            "name": "authentication",
+            "description": "User authentication and authorization"
+        },
+        {
+            "name": "ai_models",
+            "description": "AI model management and routing"
+        },
+        {
+            "name": "enhanced_chat",
+            "description": "Enhanced chat with context integration and streaming"
+        },
+        {
+            "name": "external_apis",
+            "description": "External API integrations (search, crypto, news)"
+        },
+        {
+            "name": "vector",
+            "description": "Vector database operations and semantic search"
+        },
+        {
+            "name": "basic_chat",
+            "description": "Basic chat functionality (legacy)"
+        },
+        {
+            "name": "security",
+            "description": "Security and rate limiting endpoints"
+        }
+    ]
 )
 
 # Add security and logging middleware
