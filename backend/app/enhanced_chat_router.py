@@ -10,7 +10,8 @@ import uuid
 
 from app.chat.schemas import MessageCreate, ConversationCreate, ChatResponse, MessageResponse
 from app.enhanced_chat_service import EnhancedChatService
-from app.auth.router import oauth2_scheme
+from app.auth.middleware import get_optional_user, get_current_active_user, create_user_context
+from app.auth.schemas import UserResponse
 from app.external_apis.search_service import SearchProvider
 from app.streaming import streaming_manager
 
@@ -66,19 +67,18 @@ manager = ConnectionManager()
 @router.post("/conversations", response_model=dict)
 async def create_conversation(
     conversation: ConversationCreate,
-    token: str = Depends(oauth2_scheme)
+    current_user: Optional[UserResponse] = Depends(get_optional_user)
 ):
     """Create a new enhanced conversation with context tracking"""
     try:
-        # In production, extract user_id from JWT token
-        user_id = None  # Would come from JWT token
+        user_id = current_user.id if current_user else None
         
         new_conversation = await enhanced_chat_service.create_conversation(
             title=conversation.title,
             user_id=user_id
         )
         
-        logger.info(f"Created enhanced conversation: {new_conversation['id']}")
+        logger.info(f"Created enhanced conversation: {new_conversation['id']} for user: {current_user.username if current_user else 'anonymous'}")
         return new_conversation
         
     except Exception as e:
@@ -88,12 +88,11 @@ async def create_conversation(
 @router.get("/conversations", response_model=List[dict])
 async def get_conversations(
     limit: int = Query(50, ge=1, le=100, description="Number of conversations to retrieve"),
-    token: str = Depends(oauth2_scheme)
+    current_user: Optional[UserResponse] = Depends(get_optional_user)
 ):
     """Get user's enhanced conversations with metadata"""
     try:
-        # In production, extract user_id from JWT token
-        user_id = None  # Would come from JWT token
+        user_id = current_user.id if current_user else None
         
         conversations = await enhanced_chat_service.get_user_conversations(
             user_id=user_id,
@@ -111,7 +110,7 @@ async def get_conversation(
     conversation_id: str,
     include_messages: bool = Query(False, description="Include conversation messages"),
     message_limit: int = Query(50, ge=1, le=200, description="Number of messages to include"),
-    token: str = Depends(oauth2_scheme)
+    current_user: Optional[UserResponse] = Depends(get_optional_user)
 ):
     """Get conversation details and summary"""
     try:
@@ -153,7 +152,7 @@ async def get_conversation_messages(
     limit: int = Query(100, ge=1, le=500, description="Number of messages to retrieve"),
     offset: int = Query(0, ge=0, description="Number of messages to skip"),
     include_context: bool = Query(False, description="Include context data in messages"),
-    token: str = Depends(oauth2_scheme)
+    current_user: Optional[UserResponse] = Depends(get_optional_user)
 ):
     """Get messages for a conversation"""
     try:
@@ -188,7 +187,7 @@ async def get_conversation_messages(
 @router.delete("/conversations/{conversation_id}")
 async def clear_conversation(
     conversation_id: str,
-    token: str = Depends(oauth2_scheme)
+    current_user: Optional[UserResponse] = Depends(get_optional_user)
 ):
     """Clear conversation history"""
     try:
@@ -202,7 +201,7 @@ async def clear_conversation(
 async def create_message(
     conversation_id: str,
     message: MessageCreate,
-    token: str = Depends(oauth2_scheme)
+    current_user: Optional[UserResponse] = Depends(get_optional_user)
 ):
     """Add a message to enhanced conversation"""
     try:
@@ -233,23 +232,27 @@ async def create_message(
 async def chat_with_enhanced_ai(
     conversation_id: str,
     message: MessageCreate,
-    token: str = Depends(oauth2_scheme)
+    current_user: Optional[UserResponse] = Depends(get_optional_user)
 ):
     """Stream AI response with enhanced capabilities using SSE"""
     
     # Generate unique stream ID
     stream_id = f"chat_{conversation_id}_{uuid.uuid4().hex[:8]}"
     
+    # Create user context
+    user_context = create_user_context(current_user)
+    
     async def enhanced_response_generator():
         """Generator for enhanced AI response with context"""
         try:
-            logger.info(f"Starting enhanced chat stream {stream_id} for conversation {conversation_id}")
+            logger.info(f"Starting enhanced chat stream {stream_id} for conversation {conversation_id} by user {user_context.get('username')}")
             
-            # Generate response with enhanced context
+            # Generate response with enhanced context and user information
             async for chunk in enhanced_chat_service.generate_ai_response(
                 message=message.content,
                 model_id=message.model_id or "openai/gpt-oss-120b",
-                conversation_id=conversation_id
+                conversation_id=conversation_id,
+                user_context=user_context
             ):
                 yield chunk
                 
@@ -275,7 +278,7 @@ async def chat_with_enhanced_ai_stream(
     conversation_id: str,
     message: MessageCreate,
     stream_type: str = Query("sse", description="Stream type: sse or websocket"),
-    token: str = Depends(oauth2_scheme)
+    current_user: Optional[UserResponse] = Depends(get_optional_user)
 ):
     """Alternative streaming endpoint with configurable stream type"""
     
@@ -284,7 +287,7 @@ async def chat_with_enhanced_ai_stream(
     
     # For SSE, redirect to main chat endpoint
     if stream_type == "sse":
-        return await chat_with_enhanced_ai(conversation_id, message, token)
+        return await chat_with_enhanced_ai(conversation_id, message, current_user)
     
     # For WebSocket, return connection info
     return {
@@ -382,7 +385,7 @@ async def enhanced_websocket_endpoint(websocket: WebSocket, conversation_id: str
         manager.disconnect(connection_id)
 
 @router.get("/streams")
-async def get_active_streams(token: str = Depends(oauth2_scheme)):
+async def get_active_streams(current_user: Optional[UserResponse] = Depends(get_optional_user)):
     """Get information about active streaming connections"""
     return {
         "active_streams": streaming_manager.get_active_streams(),
@@ -392,7 +395,7 @@ async def get_active_streams(token: str = Depends(oauth2_scheme)):
     }
 
 @router.delete("/streams/{stream_id}")
-async def close_stream(stream_id: str, token: str = Depends(oauth2_scheme)):
+async def close_stream(stream_id: str, current_user: Optional[UserResponse] = Depends(get_optional_user)):
     """Force close a specific stream"""
     await streaming_manager.close_stream(stream_id)
     return {"message": f"Stream {stream_id} closed", "success": True}
@@ -540,7 +543,7 @@ async def get_chat_capabilities():
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/connections")
-async def get_active_connections(token: str = Depends(oauth2_scheme)):
+async def get_active_connections(current_user: Optional[UserResponse] = Depends(get_optional_user)):
     """Get active WebSocket connections (admin endpoint)"""
     return {
         "active_connections": manager.get_active_connections(),
@@ -553,7 +556,7 @@ async def search_web(
     query: str = Query(..., description="Search query"),
     count: int = Query(10, ge=1, le=20, description="Number of results"),
     provider: Optional[str] = Query(None, description="Specific provider to use"),
-    token: str = Depends(oauth2_scheme)
+    current_user: Optional[UserResponse] = Depends(get_optional_user)
 ):
     """Perform web search using available providers"""
     try:
@@ -584,7 +587,7 @@ async def search_news(
     count: int = Query(5, ge=1, le=20, description="Number of results"),
     time_period: str = Query("1d", description="Time period (1h, 1d, 1w, 1m, 1y)"),
     provider: Optional[str] = Query(None, description="Specific provider to use"),
-    token: str = Depends(oauth2_scheme)
+    current_user: Optional[UserResponse] = Depends(get_optional_user)
 ):
     """Search for news using available providers"""
     try:
@@ -612,7 +615,7 @@ async def search_news(
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/crypto/market")
-async def get_crypto_market_data(token: str = Depends(oauth2_scheme)):
+async def get_crypto_market_data(current_user: Optional[UserResponse] = Depends(get_optional_user)):
     """Get cryptocurrency market data"""
     try:
         if not enhanced_chat_service.binance_service.is_available():

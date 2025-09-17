@@ -5,6 +5,11 @@ import logging
 from app.config import settings
 from .serpapi import SerpAPIService
 from .brave_search import BraveSearchService
+from ..core.error_handling import (
+    retry_with_backoff, RetryConfig, graceful_degradation, 
+    ServiceType, ErrorCode, ErrorSeverity, error_metrics
+)
+from ..core.logging_middleware import external_api_logger
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +41,18 @@ class SearchService:
         self._provider_health = {}
         self._provider_response_times = {}
         
+        # Configure retry settings
+        self.retry_config = RetryConfig(
+            max_retries=3,
+            base_delay=1.0,
+            max_delay=30.0,
+            exponential_base=2.0,
+            jitter=True
+        )
+        
+        # Register fallback functions
+        self._register_fallbacks()
+        
     async def search_web(
         self, 
         query: str, 
@@ -66,23 +83,41 @@ class SearchService:
             try:
                 logger.info(f"Attempting web search with {provider_enum.value} for query: {query}")
                 
-                # Measure response time
-                import time
-                start_time = time.time()
+                # Start external API call tracking
+                call_id = external_api_logger.start_call(
+                    service_name=f"search_{provider_enum.value}",
+                    method="GET",
+                    url="web_search",
+                    request_data={"query": query, "count": count, "location": location}
+                )
                 
+                # Use retry logic with exponential backoff
                 if provider_enum == SearchProvider.SERPAPI:
-                    results = await service.search_web(query, count, location)
+                    results = await retry_with_backoff(
+                        service.search_web,
+                        self.retry_config,
+                        ServiceType.SEARCH_API,
+                        query, count, location
+                    )
                 else:  # Brave Search
-                    results = await service.search_web(query, count)
+                    results = await retry_with_backoff(
+                        service.search_web,
+                        self.retry_config,
+                        ServiceType.SEARCH_API,
+                        query, count
+                    )
                 
-                response_time = time.time() - start_time
-                self._update_provider_metrics(provider_enum, response_time, success=True)
+                # Finish tracking successful call
+                external_api_logger.finish_call(
+                    call_id=call_id,
+                    status_code=200,
+                    response_data={"results_count": len(results) if results else 0}
+                )
                 
                 if results:
                     # Add provider metadata to results
                     for result in results:
                         result["provider"] = provider_enum.value
-                        result["response_time"] = response_time
                     
                     logger.info(f"Web search successful with {provider_enum.value}: {len(results)} results")
                     return results
@@ -91,7 +126,18 @@ class SearchService:
                     
             except Exception as e:
                 logger.error(f"Web search failed with {provider_enum.value}: {str(e)}")
-                self._update_provider_metrics(provider_enum, 0, success=False)
+                
+                # Record error metrics
+                error_metrics.record_error(
+                    service=ServiceType.SEARCH_API,
+                    error_code=ErrorCode.API_UNAVAILABLE,
+                    severity=ErrorSeverity.MEDIUM,
+                    details={
+                        "provider": provider_enum.value,
+                        "query": query,
+                        "error": str(e)
+                    }
+                )
                 continue
         
         logger.error(f"All web search providers failed for query: {query}")
@@ -127,12 +173,22 @@ class SearchService:
             try:
                 logger.info(f"Attempting news search with {provider_enum.value} for query: {query}")
                 
-                # Measure response time
-                import time
-                start_time = time.time()
+                # Start external API call tracking
+                call_id = external_api_logger.start_call(
+                    service_name=f"search_{provider_enum.value}",
+                    method="GET",
+                    url="news_search",
+                    request_data={"query": query, "count": count, "time_period": time_period}
+                )
                 
+                # Use retry logic with exponential backoff
                 if provider_enum == SearchProvider.SERPAPI:
-                    results = await service.search_news(query, count, time_period)
+                    results = await retry_with_backoff(
+                        service.search_news,
+                        self.retry_config,
+                        ServiceType.SEARCH_API,
+                        query, count, time_period
+                    )
                 else:  # Brave Search
                     # Map time periods for Brave Search
                     brave_time_map = {
@@ -143,16 +199,24 @@ class SearchService:
                         "1y": "py"
                     }
                     brave_time = brave_time_map.get(time_period, "pd")
-                    results = await service.search_news(query, count, brave_time)
+                    results = await retry_with_backoff(
+                        service.search_news,
+                        self.retry_config,
+                        ServiceType.SEARCH_API,
+                        query, count, brave_time
+                    )
                 
-                response_time = time.time() - start_time
-                self._update_provider_metrics(provider_enum, response_time, success=True)
+                # Finish tracking successful call
+                external_api_logger.finish_call(
+                    call_id=call_id,
+                    status_code=200,
+                    response_data={"results_count": len(results) if results else 0}
+                )
                 
                 if results:
                     # Add provider metadata to results
                     for result in results:
                         result["provider"] = provider_enum.value
-                        result["response_time"] = response_time
                     
                     logger.info(f"News search successful with {provider_enum.value}: {len(results)} results")
                     return results
@@ -161,7 +225,18 @@ class SearchService:
                     
             except Exception as e:
                 logger.error(f"News search failed with {provider_enum.value}: {str(e)}")
-                self._update_provider_metrics(provider_enum, 0, success=False)
+                
+                # Record error metrics
+                error_metrics.record_error(
+                    service=ServiceType.SEARCH_API,
+                    error_code=ErrorCode.API_UNAVAILABLE,
+                    severity=ErrorSeverity.MEDIUM,
+                    details={
+                        "provider": provider_enum.value,
+                        "query": query,
+                        "error": str(e)
+                    }
+                )
                 continue
         
         logger.error(f"All news search providers failed for query: {query}")
@@ -339,6 +414,96 @@ class SearchService:
             self._provider_health.clear()
             self._provider_response_times.clear()
             logger.info("Reset health metrics for all providers")
+    
+    def _register_fallbacks(self):
+        """Register fallback functions for graceful degradation."""
+        # Register mock search results as ultimate fallback
+        graceful_degradation.register_fallback(
+            service=ServiceType.SEARCH_API,
+            fallback_func=self._generate_mock_search_results,
+            priority=1  # Lowest priority
+        )
+    
+    async def _generate_mock_search_results(self, query: str, count: int = 10, **kwargs) -> List[Dict[str, Any]]:
+        """Generate mock search results when all providers fail."""
+        logger.info(f"Generating mock search results for query: {query}")
+        
+        mock_results = [
+            {
+                "title": f"Mock Search Result {i+1} for '{query}'",
+                "description": f"This is a mock search result generated when external search APIs are unavailable. Query: {query}",
+                "url": f"https://example.com/mock-result-{i+1}",
+                "published": "Mock Date",
+                "source": "Mock Source",
+                "type": "web",
+                "provider": "mock"
+            }
+            for i in range(min(count, 3))  # Limit mock results
+        ]
+        
+        return mock_results
+    
+    async def get_service_health(self) -> Dict[str, Any]:
+        """Get comprehensive health status of search services."""
+        health_status = {}
+        
+        # Check SerpAPI health
+        if self.serpapi.is_available():
+            try:
+                serpapi_health = await self.serpapi.health_check()
+                health_status["serpapi"] = serpapi_health
+            except Exception as e:
+                health_status["serpapi"] = {
+                    "status": "error",
+                    "message": f"Health check failed: {str(e)}",
+                    "service": "SerpAPI"
+                }
+        else:
+            health_status["serpapi"] = {
+                "status": "unavailable",
+                "message": "API key not configured",
+                "service": "SerpAPI"
+            }
+        
+        # Check Brave Search health
+        if self.brave.is_available():
+            try:
+                brave_health = await self.brave.health_check()
+                health_status["brave"] = brave_health
+            except Exception as e:
+                health_status["brave"] = {
+                    "status": "error",
+                    "message": f"Health check failed: {str(e)}",
+                    "service": "Brave Search"
+                }
+        else:
+            health_status["brave"] = {
+                "status": "unavailable",
+                "message": "API key not configured",
+                "service": "Brave Search"
+            }
+        
+        # Determine overall search service health
+        healthy_services = sum(1 for status in health_status.values() if status.get("status") == "healthy")
+        total_services = len(health_status)
+        
+        if healthy_services == total_services:
+            overall_status = "healthy"
+        elif healthy_services > 0:
+            overall_status = "degraded"
+        else:
+            overall_status = "unhealthy"
+        
+        return {
+            "overall_status": overall_status,
+            "services": health_status,
+            "summary": {
+                "total_services": total_services,
+                "healthy_services": healthy_services,
+                "primary_available": health_status.get("serpapi", {}).get("status") == "healthy",
+                "fallback_available": health_status.get("brave", {}).get("status") == "healthy"
+            }
+        }
 
 
 # Global search service instance

@@ -13,6 +13,7 @@ from app.external_apis.binance import BinanceService
 from app.ai.service import AIService
 from app.vector.service import vector_service
 from app.conversation_service import conversation_service
+from app.auth.schemas import UserResponse
 
 logger = logging.getLogger(__name__)
 
@@ -68,31 +69,40 @@ class EnhancedChatService:
                                  message: str,
                                  model_id: str,
                                  conversation_id: Optional[str] = None,
-                                 conversation_history: List[Dict] = None) -> AsyncGenerator[str, None]:
+                                 conversation_history: List[Dict] = None,
+                                 user_context: Optional[Dict[str, Any]] = None) -> AsyncGenerator[str, None]:
         """Generate AI response with enhanced context from external APIs and conversation history"""
         
         try:
+            # Set default user context if not provided
+            if user_context is None:
+                user_context = {
+                    "user_id": None,
+                    "username": "anonymous",
+                    "is_authenticated": False
+                }
+            
             # Get conversation history from database if available
             if conversation_id and not conversation_history:
-                conversation_history = await self._get_conversation_history_from_db(conversation_id)
+                conversation_history = await self._get_conversation_history_from_db(conversation_id, user_context)
             
             if conversation_history is None:
                 conversation_history = []
             
             # Analyze message for external data needs with intelligent context detection
-            enhanced_context = await self._get_enhanced_context(message)
+            enhanced_context = await self._get_enhanced_context(message, user_context)
             
-            # Build system message with enhanced context
-            system_message = self._build_enhanced_system_message(enhanced_context)
+            # Build system message with enhanced context and user information
+            system_message = self._build_enhanced_system_message(enhanced_context, user_context)
             
             # Prepare messages for AI service
             messages = [{"role": "system", "content": system_message}]
             messages.extend(conversation_history[-10:])  # Last 10 messages for context
             messages.append({"role": "user", "content": message})
             
-            # Store user message in database
+            # Store user message in database with user context
             if conversation_id:
-                await self._store_user_message(conversation_id, message)
+                await self._store_user_message(conversation_id, message, user_context)
             
             # Generate response using AI service with router
             response_content = ""
@@ -108,8 +118,8 @@ class EnhancedChatService:
             
             # Store AI response and cache the conversation if we have an ID
             if conversation_id:
-                await self._store_ai_response(conversation_id, response_content, model_id, enhanced_context)
-                await self._cache_conversation_message(conversation_id, message, response_content, model_id, enhanced_context)
+                await self._store_ai_response(conversation_id, response_content, model_id, enhanced_context, user_context)
+                await self._cache_conversation_message(conversation_id, message, response_content, model_id, enhanced_context, user_context)
                 
         except Exception as e:
             logger.error(f"Error in generate_ai_response: {e}")
@@ -117,7 +127,7 @@ class EnhancedChatService:
             async for chunk in self._generate_enhanced_mock_response(message, {}):
                 yield chunk
     
-    async def _get_enhanced_context(self, message: str) -> Dict[str, Any]:
+    async def _get_enhanced_context(self, message: str, user_context: Dict[str, Any] = None) -> Dict[str, Any]:
         """Intelligent context detection and data retrieval from multiple sources"""
         context = {}
         message_lower = message.lower()
@@ -265,12 +275,23 @@ class EnhancedChatService:
         
         return {}
     
-    def _build_enhanced_system_message(self, context: Dict[str, Any]) -> str:
+    def _build_enhanced_system_message(self, context: Dict[str, Any], user_context: Dict[str, Any] = None) -> str:
         """Build comprehensive system message with all available context"""
-        base_message = """You are Checkmate Spec Preview, an AI assistant inspired by Sync. You're witty, 
-        informative, and have access to real-time information through multiple data sources. You can search 
-        the web, get cryptocurrency data, access news, and retrieve domain-specific knowledge. Use the 
-        provided context to give accurate, current, and helpful responses."""
+        # Build user-aware base message
+        if user_context and user_context.get("is_authenticated"):
+            username = user_context.get("username", "User")
+            base_message = f"""You are Checkmate Spec Preview, an AI assistant inspired by Sync. You're witty, 
+            informative, and have access to real-time information through multiple data sources. You can search 
+            the web, get cryptocurrency data, access news, and retrieve domain-specific knowledge. 
+
+            You are currently assisting {username}, who is authenticated. You can provide personalized responses 
+            and maintain conversation context. Use the provided context to give accurate, current, and helpful responses."""
+        else:
+            base_message = """You are Checkmate Spec Preview, an AI assistant inspired by Sync. You're witty, 
+            informative, and have access to real-time information through multiple data sources. You can search 
+            the web, get cryptocurrency data, access news, and retrieve domain-specific knowledge. 
+
+            You are currently in anonymous mode. Use the provided context to give accurate, current, and helpful responses."""
         
         context_sections = []
         
@@ -388,7 +409,7 @@ class EnhancedChatService:
         
         return []
     
-    async def _get_conversation_history_from_db(self, conversation_id: str) -> List[Dict[str, str]]:
+    async def _get_conversation_history_from_db(self, conversation_id: str, user_context: Dict[str, Any] = None) -> List[Dict[str, str]]:
         """Retrieve conversation history from database with Redis fallback"""
         try:
             # First try to get from database
@@ -409,25 +430,40 @@ class EnhancedChatService:
             # Fallback to Redis cache
             return await self._get_conversation_history(conversation_id)
     
-    async def _store_user_message(self, conversation_id: str, message: str):
+    async def _store_user_message(self, conversation_id: str, message: str, user_context: Dict[str, Any] = None):
         """Store user message in database"""
         try:
+            # Add user context to message metadata
+            metadata = {}
+            if user_context:
+                metadata = {
+                    "user_id": user_context.get("user_id"),
+                    "username": user_context.get("username"),
+                    "is_authenticated": user_context.get("is_authenticated", False)
+                }
+            
             await conversation_service.add_message(
                 conversation_id=conversation_id,
                 content=message,
-                role="user"
+                role="user",
+                metadata=metadata
             )
-            logger.info(f"Stored user message in conversation {conversation_id}")
+            logger.info(f"Stored user message in conversation {conversation_id} for user {user_context.get('username', 'anonymous')}")
         except Exception as e:
             logger.error(f"Error storing user message: {e}")
     
-    async def _store_ai_response(self, conversation_id: str, response: str, model_id: str, context: Dict[str, Any]):
+    async def _store_ai_response(self, conversation_id: str, response: str, model_id: str, context: Dict[str, Any], user_context: Dict[str, Any] = None):
         """Store AI response in database with context data"""
         try:
             context_summary = {
                 "context_types": list(context.keys()),
                 "providers_used": self._extract_providers_from_context(context),
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
+                "user_context": {
+                    "user_id": user_context.get("user_id") if user_context else None,
+                    "username": user_context.get("username") if user_context else "anonymous",
+                    "is_authenticated": user_context.get("is_authenticated", False) if user_context else False
+                }
             }
             
             await conversation_service.add_message(
@@ -437,7 +473,7 @@ class EnhancedChatService:
                 model_id=model_id,
                 context_data=context_summary
             )
-            logger.info(f"Stored AI response in conversation {conversation_id}")
+            logger.info(f"Stored AI response in conversation {conversation_id} for user {user_context.get('username', 'anonymous') if user_context else 'anonymous'}")
         except Exception as e:
             logger.error(f"Error storing AI response: {e}")
     
@@ -460,7 +496,7 @@ class EnhancedChatService:
         return providers
     
     async def _cache_conversation_message(self, conversation_id: str, user_message: str, 
-                                        ai_response: str, model_id: str, context: Dict[str, Any]):
+                                        ai_response: str, model_id: str, context: Dict[str, Any], user_context: Dict[str, Any] = None):
         """Cache conversation message in Redis"""
         if not self.redis_client:
             await self._initialize_redis()

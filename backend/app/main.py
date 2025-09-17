@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from contextlib import asynccontextmanager
 import uvicorn
+import logging
 
 from app.auth.router import router as auth_router
 from app.chat.router import router as chat_router
@@ -10,26 +11,35 @@ from app.enhanced_chat_router import router as enhanced_chat_router
 from app.external_apis_router import router as external_apis_router
 from app.ai.endpoints import router as ai_router
 from app.vector.router import router as vector_router
+from app.api.health import router as health_router
+from app.api.security import router as security_router
 from app.database.connection import initialize_database, close_database
 from app.database.migrations import run_migrations
 from app.vector.service import vector_service
 from app.config import settings
+from app.core.logging_middleware import LoggingMiddleware
+from app.core.error_handling import handle_api_error
+from app.core.rate_limiting import RateLimitMiddleware
+from app.core.security import SecurityHeadersMiddleware
+
+logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    print("🚀 Starting Checkmate Spec Preview API...")
-    print("📡 External APIs: Brave Search, Groq, Binance")
-    print("🔧 Initializing database connections...")
+    logger.info("🚀 Starting Checkmate Spec Preview API...")
+    logger.info("📡 External APIs: SerpAPI, Brave Search, Groq, OpenAI, Anthropic, Binance")
+    logger.info("🔧 Initializing database connections...")
     await initialize_database()
-    print("📊 Running database migrations...")
+    logger.info("📊 Running database migrations...")
     await run_migrations()
-    print("🤖 Initializing vector service...")
+    logger.info("🤖 Initializing vector service...")
     await vector_service.initialize()
-    print("✅ All services initialized successfully")
+    logger.info("✅ All services initialized successfully")
+    logger.info("🔍 Error handling and monitoring system active")
     yield
     # Shutdown
-    print("🔄 Shutting down Checkmate Spec Preview API...")
+    logger.info("🔄 Shutting down Checkmate Spec Preview API...")
     await close_database()
 
 app = FastAPI(
@@ -37,6 +47,17 @@ app = FastAPI(
     description="Backend API for Checkmate Spec Preview - AI Agent inspired by Sync",
     version="1.0.0",
     lifespan=lifespan
+)
+
+# Add security and logging middleware
+app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(LoggingMiddleware)
+
+# Add rate limiting middleware
+app.add_middleware(
+    RateLimitMiddleware,
+    requests_per_minute=settings.RATE_LIMIT_REQUESTS,
+    redis_url=settings.REDIS_URL
 )
 
 # CORS configuration for Next.js frontend
@@ -48,7 +69,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include routers - Enhanced chat router first for priority
+# Include routers - Health checks first, then enhanced chat router for priority
+app.include_router(health_router, prefix="/api", tags=["health"])
+app.include_router(security_router, prefix="/api", tags=["security"])
 app.include_router(auth_router, prefix="/api/auth", tags=["authentication"])
 app.include_router(ai_router, prefix="/api/ai", tags=["ai_models"])
 app.include_router(enhanced_chat_router, prefix="/api/chat", tags=["enhanced_chat"])
@@ -68,6 +91,7 @@ async def root():
 
 @app.get("/health")
 async def health_check():
+    """Legacy health endpoint for backward compatibility."""
     return {"status": "healthy", "service": "checkmate-spec-preview-api"}
 
 @app.get("/api/status")
@@ -86,9 +110,15 @@ async def api_status():
             "Server-Sent Events (SSE) streaming",
             "WebSocket real-time communication",
             "Intelligent context detection",
-            "Automatic fallback and error recovery"
+            "Automatic fallback and error recovery",
+            "Comprehensive error handling and monitoring",
+            "Structured logging for all API calls",
+            "Health checks for all services",
+            "Retry logic with exponential backoff",
+            "Graceful degradation when services fail"
         ],
         "endpoints": {
+            "health": "/api/health/*",
             "auth": "/api/auth/*",
             "ai": "/api/ai/*",
             "enhanced_chat": "/api/chat/*",
