@@ -113,6 +113,7 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = True
+        extra = "ignore"  # Allow extra fields from environment
         
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
