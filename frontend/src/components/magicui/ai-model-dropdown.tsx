@@ -63,7 +63,7 @@ export const AIModelDropdown = ({
         console.error("Failed to fetch AI models:", err);
         setError("Failed to load AI models");
 
-        // Fallback to default models if API fails - using the specific Groq models from the task
+        // Fallback to your preferred models only
         setAiModels([
           {
             id: "choose-model",
@@ -101,19 +101,6 @@ export const AIModelDropdown = ({
             name: "Kimi K2 Instruct",
             provider: "Groq",
             description: "MoonshotAI's Kimi K2 instruction-tuned model",
-          },
-          {
-            id: "llama-3.1-70b-versatile",
-            name: "Llama 3.1 70B Versatile",
-            provider: "Groq",
-            description:
-              "Meta's Llama 3.1 70B model optimized for versatile tasks",
-          },
-          {
-            id: "llama-3.1-8b-instant",
-            name: "Llama 3.1 8B Instant",
-            provider: "Groq",
-            description: "Meta's Llama 3.1 8B model optimized for speed",
           },
         ]);
       } finally {
