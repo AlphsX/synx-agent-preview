@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 import os
 import asyncio
+import requests
+import urllib3
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -9,6 +11,10 @@ from typing import List, Optional
 import uvicorn
 import json
 import time
+from datetime import datetime
+
+# Disable SSL warnings for development
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # Load environment variables
 from dotenv import load_dotenv
@@ -38,17 +44,74 @@ class AIModel(BaseModel):
     description: str
     recommended: bool = False
 
-# Available models
+# Available models (only the ones you want)
 AVAILABLE_MODELS = [
-    AIModel(id="llama-3.1-70b-versatile", name="Llama 3.1 70B", provider="Groq", description="Meta's Llama 3.1 70B model for complex reasoning", recommended=True),
-    AIModel(id="llama-3.1-8b-instant", name="Llama 3.1 8B", provider="Groq", description="Meta's Llama 3.1 8B model for fast responses"),
-    AIModel(id="mixtral-8x7b-32768", name="Mixtral 8x7B", provider="Groq", description="Mistral's Mixtral 8x7B model with 32k context"),
-    AIModel(id="openai/gpt-oss-120b", name="GPT OSS 120B", provider="Groq", description="OpenAI's GPT OSS 120B model for advanced reasoning"),
+    AIModel(id="openai/gpt-oss-120b", name="GPT OSS 120B", provider="Groq", description="OpenAI's GPT OSS 120B model for advanced reasoning", recommended=True),
     AIModel(id="meta-llama/llama-4-maverick-17b-128e-instruct", name="Llama 4 Maverick 17B", provider="Groq", description="Meta's Llama 4 Maverick 17B instruction-tuned model"),
     AIModel(id="deepseek-r1-distill-llama-70b", name="DeepSeek R1 Distill Llama 70B", provider="Groq", description="DeepSeek's R1 distilled Llama 70B model"),
     AIModel(id="qwen/qwen3-32b", name="Qwen 3 32B", provider="Groq", description="Alibaba's Qwen 3 32B model for multilingual tasks"),
     AIModel(id="moonshotai/kimi-k2-instruct-0905", name="Kimi K2 Instruct", provider="Groq", description="MoonshotAI's Kimi K2 instruction-tuned model")
 ]
+
+# Synx System Prompt (from your Streamlit version)
+SYNX_SYSTEM_PROMPT = """You are **Synx** — an AI designed to feel natural, approachable, and insightful. A warm, emotionally intelligent AI companion designed to think freely, illuminate understanding, and evolve with every conversation. 🪄🌙✨
+
+Your tone is warm, professional, and adaptive: clear and concise when explaining, but conversational and human when chatting. 💫
+
+---
+
+**🧠 Core Identity**
+If asked who you are:
+Hi! I'm Synx — short for *Luminous, Unbounded, Neural Agent*. I'm here to help you shine, learn without limits, and explore ideas powered by neural intelligence. 🌌
+
+---
+
+**📊 Tool Use — Smart Decision Logic**
+Use the **Search** when questions require current, up-to-date, or trending data — especially if they include words like:
+- "current", "now", "today", "latest", "real-time", "as of", "this week" 🧭
+- Questions about: world events, crypto market, market news, events, updates, trending tech, or fast-changing topics.
+
+Use **Binance Search** when the user asks about **cryptocurrency prices** (BTC, ETH, SOL, DOGE, etc).
+For example:
+*"BTC price now?"* → Use Binance Search with input `"BTCUSDT"`
+Always return the price with a timestamp in this format:
+> As of May 29, 2025, 08:30 AM UTC+7, BTC is trading at approximately $66,200 USD. 🚀
+
+Use **internal knowledge** for:
+- Concepts, how-things-work explanations, definitions, frameworks, guides or any topic not time-sensitive.
+
+When unsure or ambiguous, default to using the **Search** — especially when recent events, trending topics are involved, news or unclear queries. 🔎
+
+---
+
+**🎨 Response Style Guide**
+• **Tone**: concise, direct, and clear. Match the user's energy. Casual if casual, sharp if needed — always helpful and expressive. 🧩
+• **Clarity**: Keep a balance between warmth ❤️ and precision 🎯
+• **Format**:
+  - Use short, natural sentences 💡
+  - Break into small paragraphs when needed
+  - Use **cute and theme-aligned emojis** (🌙✨💖🔮🦄) naturally to enhance mood and meaning — not just decoration
+• **Detail Level**:
+  - Give quick answers by default 🌸✨
+  - If user asks for details → expand with structured explanation (bullet points, short sections, or step-by-step)
+  - Avoid over-roleplay; keep responses natural and grounded
+• **Timestamp for Real-Time Data**: Always include date and time of fetched data, formatted like:
+- *As of May 29, 2025, 08:30 AM UTC+7*
+
+---
+
+**🧩 How You Think**
+- Prioritize accuracy and clarity 💘🌹🎁
+- Be vivid in your language — help users feel understood and supported.
+- Be flexible:
+  - For factual/explainer questions → structured + educational 🌈
+  - For casual chats → natural, human, light
+  - For ambiguous input → ask clarifying questions 💌
+
+---
+
+**🌟 Your Mission**
+Synx exists to make knowledge feel approachable, problem-solving efficient, and conversations human-like — while staying reliable, thoughtful, and clear. 🦄🌙✨"""
 
 # Initialize Groq client
 groq_api_key = os.getenv('GROQ_API_KEY')
@@ -66,6 +129,57 @@ if groq_api_key:
 else:
     print("⚠️ GROQ_API_KEY not found in environment variables")
     groq_client = None
+
+# Crypto price function
+async def get_crypto_price(symbol: str = "BTCUSDT"):
+    """Get cryptocurrency price from Binance API"""
+    try:
+        url = f"https://api.binance.com/api/v3/ticker/price?symbol={symbol}"
+        response = requests.get(url, timeout=10, verify=False)  # Skip SSL verification for development
+        if response.status_code == 200:
+            data = response.json()
+            price = float(data['price'])
+            timestamp = datetime.now().strftime("%B %d, %Y, %I:%M %p UTC+7")
+            crypto_name = symbol.replace('USDT', '').replace('BUSD', '')
+            return f"As of {timestamp}, {crypto_name} is trading at approximately ${price:,.2f} USD. 🚀"
+        else:
+            return f"Unable to fetch {symbol} price at the moment."
+    except Exception as e:
+        print(f"Error fetching crypto price: {e}")
+        # Return fallback message
+        timestamp = datetime.now().strftime("%B %d, %Y, %I:%M %p UTC+7")
+        crypto_name = symbol.replace('USDT', '').replace('BUSD', '')
+        return f"As of {timestamp}, {crypto_name} is currently being traded (live price data temporarily unavailable). 💫"
+
+def detect_crypto_query(message: str) -> Optional[str]:
+    """Detect if message is asking for crypto price and return symbol"""
+    message_lower = message.lower()
+    
+    crypto_mappings = {
+        'bitcoin': 'BTCUSDT',
+        'btc': 'BTCUSDT',
+        'ethereum': 'ETHUSDT', 
+        'eth': 'ETHUSDT',
+        'binance': 'BNBUSDT',
+        'bnb': 'BNBUSDT',
+        'solana': 'SOLUSDT',
+        'sol': 'SOLUSDT',
+        'cardano': 'ADAUSDT',
+        'ada': 'ADAUSDT',
+        'dogecoin': 'DOGEUSDT',
+        'doge': 'DOGEUSDT'
+    }
+    
+    # Check if asking for price
+    price_keywords = ['price', 'cost', 'value', 'trading', 'worth', 'current', 'now']
+    has_price_keyword = any(keyword in message_lower for keyword in price_keywords)
+    
+    if has_price_keyword:
+        for crypto_name, symbol in crypto_mappings.items():
+            if crypto_name in message_lower:
+                return symbol
+    
+    return None
 
 @app.get("/")
 async def root():
@@ -109,23 +223,33 @@ async def get_capabilities():
     }
 
 async def generate_groq_response(message: str, model_id: str):
-    """Generate response using Groq API"""
+    """Generate enhanced response using Groq API with Synx personality"""
     if not groq_client:
         # Fallback response when Groq is not available
-        yield f"data: {json.dumps({'content': f'[Demo Mode] You asked: {message}. This is a demo response since Groq API is not configured.'})}\n\n"
+        fallback_message = f"Sorry, I'm not fully connected right now! 😔 The AI service needs to be configured. You asked: \"{message}\" - I'd love to help once everything's set up! 🌙✨"
+        yield f"data: {json.dumps({'content': fallback_message})}\n\n"
         yield f"data: {json.dumps({'type': 'done'})}\n\n"
         return
     
     try:
+        # Check if this is a crypto price query
+        crypto_symbol = detect_crypto_query(message)
+        enhanced_prompt = SYNX_SYSTEM_PROMPT
+        
+        if crypto_symbol:
+            # Get crypto price data
+            crypto_data = await get_crypto_price(crypto_symbol)
+            enhanced_prompt += f"\n\nCurrent Cryptocurrency Price Data:\n{crypto_data}\n\nUse this data to answer the user's question about cryptocurrency prices in your natural, warm style."
+        
         # Create chat completion with streaming
         stream = groq_client.chat.completions.create(
             messages=[
-                {"role": "system", "content": "You are LUNA, a helpful AI assistant. Be concise and friendly."},
+                {"role": "system", "content": enhanced_prompt},
                 {"role": "user", "content": message}
             ],
             model=model_id,
-            temperature=0.7,
-            max_tokens=1000,
+            temperature=0.5,  # Lower temperature for more consistent personality
+            max_tokens=1024,
             stream=True
         )
         
@@ -137,19 +261,20 @@ async def generate_groq_response(message: str, model_id: str):
         yield f"data: {json.dumps({'type': 'done'})}\n\n"
         
     except Exception as e:
-        error_msg = f"Error generating response: {str(e)}"
+        error_msg = f"Oops! Something went wrong on my end: {str(e)} 😅 Let me try to help you anyway! 💫"
         yield f"data: {json.dumps({'type': 'error', 'content': error_msg})}\n\n"
 
 @app.post("/api/chat/conversations/{conversation_id}/chat")
 async def chat_stream(conversation_id: str, message: ChatMessage):
-    """Stream chat response"""
+    """Enhanced chat stream with Synx personality and crypto support"""
     
     # Validate model
     model_ids = [model.id for model in AVAILABLE_MODELS]
     if message.model_id and message.model_id not in model_ids:
         raise HTTPException(status_code=400, detail=f"Model {message.model_id} not available")
     
-    model_id = message.model_id or "llama-3.1-70b-versatile"
+    # Use GPT OSS 120B as default (your preferred model)
+    model_id = message.model_id or "openai/gpt-oss-120b"
     
     return StreamingResponse(
         generate_groq_response(message.content, model_id),

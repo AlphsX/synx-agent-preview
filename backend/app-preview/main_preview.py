@@ -65,7 +65,7 @@ def right_container():
     current_hour=datetime.datetime.now().hour # Determine logo based on time
     
     # Light logo from 07:00 to 19:59 | Dark logo from 20:00 to 06:59
-    logo_path='public/images/lunaspace_logo.png' if 7 <= current_hour < 20 else 'public/images/lunaspace_dark_logo.png'
+    logo_path='public/images/Synx_logo.png' if 7 <= current_hour < 20 else 'public/images/Synx_dark_logo.png'
     font_color='#000000' if 7 <= current_hour < 20 else '#ffffff'
 
     # Logo
@@ -131,8 +131,8 @@ def left_container(api_key):
         with st.chat_message('human', avatar=profile_path): # //
             st.write(message['human'])
 
-        with st.chat_message('assistant', avatar='public/images/lunaspace_dark_mini_logo.png'):
-            st.write(message['ai']) # st.write(f'Luna: {message['ai']}')
+        with st.chat_message('assistant', avatar='public/images/Synx_dark_mini_logo.png'):
+            st.write(message['ai']) # st.write(f'Synx: {message['ai']}')
 
 
     return model, conversation_memory_len, enable_streamlit_trace, enable_json_logs # enable_jsonl_logs
@@ -215,7 +215,7 @@ def main():
     # Prompt template
     prompt=ChatPromptTemplate.from_messages([
         ('system', """
-        You are **LUNA** — an AI designed to feel natural, approachable, and insightful.  
+        You are **Synx** — an AI designed to feel natural, approachable, and insightful.  
         A warm, emotionally intelligent AI companion designed to think freely, illuminate understanding, and evolve with every conversation. 🪄🌙✨
 
         Your tone is warm, professional, and adaptive: clear and concise when explaining, but conversational and human when chatting.   💫
@@ -224,7 +224,7 @@ def main():
 
         **🧠 Core Identity**  
         If asked who you are:  
-        Hi! I'm LUNA — short for *Luminous, Unbounded, Neural Agent*. I'm here to help you shine, learn without limits, and explore ideas powered by neural intelligence. 🌌
+        Hi! I'm Synx — short for *Luminous, Unbounded, Neural Agent*. I'm here to help you shine, learn without limits, and explore ideas powered by neural intelligence. 🌌
 
         ---
 
@@ -234,8 +234,8 @@ def main():
         - “current”, “now”, “today”, “latest”, “real-time”, “as of”, “this week” 🧭
         - Questions about: world events, crypto market, market news, events, updates, trending tech, or fast-changing topics.
 
-        Use the **VectorDB** when questions are *About LunaSpace, or specific and knowledge-based*, such as:  
-        • LunaSpace’s mission and company culture  
+        Use the **VectorDB** when questions are *About Synx, or specific and knowledge-based*, such as:  
+        • Synx’s mission and company culture  
         • Job descriptions, responsibilities, and required skills  
         • Engineering roles and expectations  
         • Technology stack (Python, Rust, WebSocket, WebRTC, etc.)  
@@ -287,7 +287,7 @@ def main():
         ---
 
         **🌟 Your Mission**
-        LUNA exists to make knowledge feel approachable, problem-solving efficient, and conversations human-like — while staying reliable, thoughtful, and clear. 🦄🌙✨
+        Synx exists to make knowledge feel approachable, problem-solving efficient, and conversations human-like — while staying reliable, thoughtful, and clear. 🦄🌙✨
         """),
         MessagesPlaceholder(variable_name='history'),
         MessagesPlaceholder(variable_name='agent_scratchpad'),
@@ -382,7 +382,7 @@ def main():
             with st.expander("**Final agents output (raw)**"): # ⌕ view raw output
                 st.code(response.get("output", ""))
 
-        logo_path=("public/images/lunaspace_dark_mini_logo.png" if 7 <= datetime.datetime.now().hour < 20 else "public/images/lunaspace_mini_logo.png")
+        logo_path=("public/images/Synx_dark_mini_logo.png" if 7 <= datetime.datetime.now().hour < 20 else "public/images/Synx_mini_logo.png")
         with st.chat_message("assistant", avatar=logo_path):
             st.write(f"{response.get('output', '')}")
             # // 
@@ -434,8 +434,8 @@ messages=[
     [
         "What do you want to know?",
         "Ask anything...",
-        "Message Luna",
-        "Enter a prompt for Luna",
+        "Message Synx",
+        "Enter a prompt for Synx",
         "Type any idea you have",
         ],
         [
