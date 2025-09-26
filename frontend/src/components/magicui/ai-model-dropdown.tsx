@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { ChevronDown, Zap, AlertCircle, Loader2 } from "lucide-react";
+import { ChevronDown, Zap, AlertCircle, Loader2, RefreshCw } from "lucide-react";
 import { chatAPI } from "@/lib/api";
 
 type AIModel = {
@@ -44,8 +44,14 @@ export const AIModelDropdown = ({
       setError(null);
 
       try {
+        console.log("🔄 Fetching AI models from backend...");
         const response = await chatAPI.getModels();
+        console.log("✅ Models fetched successfully:", response);
+        
         const fetchedModels = response.models || [];
+        
+        // Log the fetched models for debugging
+        console.log("📋 Fetched models:", fetchedModels);
 
         // Add the "choose model" option at the beginning
         const modelsWithDefault = [
@@ -59,12 +65,13 @@ export const AIModelDropdown = ({
         ];
 
         setAiModels(modelsWithDefault);
+        console.log("📋 Models set in state:", modelsWithDefault);
       } catch (err) {
-        console.error("Failed to fetch AI models:", err);
+        console.error("❌ Failed to fetch AI models:", err);
         setError("Failed to load AI models");
 
         // Fallback to your preferred models only
-        setAiModels([
+        const fallbackModels = [
           {
             id: "choose-model",
             name: "Choose your model",
@@ -74,35 +81,38 @@ export const AIModelDropdown = ({
           {
             id: "openai/gpt-oss-120b",
             name: "GPT OSS 120B",
-            provider: "Groq",
+            provider: "OpenAI",
             description: "OpenAI's GPT OSS 120B model for advanced reasoning",
             recommended: true,
           },
           {
             id: "meta-llama/llama-4-maverick-17b-128e-instruct",
             name: "Llama 4 Maverick 17B",
-            provider: "Groq",
+            provider: "Meta",
             description: "Meta's Llama 4 Maverick 17B instruction-tuned model",
           },
           {
             id: "deepseek-r1-distill-llama-70b",
             name: "DeepSeek R1 Distill Llama 70B",
-            provider: "Groq",
+            provider: "DeepSeek",
             description: "DeepSeek's R1 distilled Llama 70B model",
           },
           {
             id: "qwen/qwen3-32b",
             name: "Qwen 3 32B",
-            provider: "Groq",
+            provider: "Alibaba",
             description: "Alibaba's Qwen 3 32B model for multilingual tasks",
           },
           {
             id: "moonshotai/kimi-k2-instruct-0905",
             name: "Kimi K2 Instruct",
-            provider: "Groq",
+            provider: "MoonshotAI",
             description: "MoonshotAI's Kimi K2 instruction-tuned model",
           },
-        ]);
+        ];
+        
+        setAiModels(fallbackModels);
+        console.log("🔄 Using fallback models:", fallbackModels);
       } finally {
         setIsLoading(false);
       }
@@ -131,6 +141,42 @@ export const AIModelDropdown = ({
   const selectedModelData =
     aiModels.find((model) => model.id === selectedModel) || aiModels[0];
 
+  const refreshModels = async () => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      console.log("🔄 Manually refreshing AI models...");
+      const response = await chatAPI.getModels();
+      console.log("✅ Models refreshed successfully:", response);
+      
+      const fetchedModels = response.models || [];
+      
+      // Log the fetched models for debugging
+      console.log("📋 Refreshed models:", fetchedModels);
+      const modelsWithDefault = [
+        {
+          id: "choose-model",
+          name: "Choose your model",
+          provider: "",
+          description: "Select an AI model to use",
+        },
+        ...fetchedModels,
+      ];
+
+      setAiModels(modelsWithDefault);
+      console.log("📋 Models updated in state:", modelsWithDefault);
+    } catch (err) {
+      console.error("❌ Failed to refresh AI models:", err);
+      setError("Failed to refresh AI models");
+      
+      // Even on error, we should still show the current models or fallback
+      // This ensures the user always sees some options
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className={`relative ${className}`} ref={dropdownRef}>
       {/* Dropdown Button */}
@@ -153,11 +199,23 @@ export const AIModelDropdown = ({
             {error ? "Error loading models" : selectedModelData.name}
           </span>
         </div>
-        <ChevronDown
-          className={`h-4 w-4 ml-2 text-gray-500 transition-transform duration-200 ${
-            isOpen ? "rotate-180" : ""
-          }`}
-        />
+        <div className="flex items-center space-x-1">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              refreshModels();
+            }}
+            className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+            title="Refresh models"
+          >
+            <RefreshCw className={`h-3 w-3 text-gray-500 ${isLoading ? 'animate-spin' : ''}`} />
+          </button>
+          <ChevronDown
+            className={`h-4 w-4 text-gray-500 transition-transform duration-200 ${
+              isOpen ? "rotate-180" : ""
+            }`}
+          />
+        </div>
       </button>
 
       {/* Dropdown Menu */}

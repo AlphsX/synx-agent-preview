@@ -1,0 +1,16 @@
+{
+  "name": "synx-ai-agent",
+  "version": "1.0.0",
+  "description": "AI Agent with Frontend and Backend",
+  "scripts": {
+    "dev": "./start_dev.sh",
+    "start": "./start_dev.sh",
+    "backend": "cd backend && python working_server.py",
+    "frontend": "cd frontend && npm run dev",
+    "install-all": "cd frontend && npm install && cd ../backend && pip install -r requirements.txt",
+    "clean": "pkill -f 'python working_server.py' || true && pkill -f 'next-server' || true"
+  },
+  "keywords": ["ai", "agent", "chat", "synx"],
+  "author": "Your Name",
+  "license": "MIT"
+}
