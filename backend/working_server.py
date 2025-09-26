@@ -25,7 +25,7 @@ app = FastAPI(title="AI Agent API", version="1.0.0")
 # CORS configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "http://0.0.0.0:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -268,13 +268,16 @@ async def generate_groq_response(message: str, model_id: str):
 async def chat_stream(conversation_id: str, message: ChatMessage):
     """Enhanced chat stream with Synx personality and crypto support"""
     
-    # Validate model
+    # Validate and set model
     model_ids = [model.id for model in AVAILABLE_MODELS]
-    if message.model_id and message.model_id not in model_ids:
-        raise HTTPException(status_code=400, detail=f"Model {message.model_id} not available")
     
     # Use GPT OSS 120B as default (your preferred model)
     model_id = message.model_id or "openai/gpt-oss-120b"
+    
+    # If provided model is not available, use default
+    if model_id not in model_ids:
+        print(f"⚠️ Model {model_id} not available, using default: openai/gpt-oss-120b")
+        model_id = "openai/gpt-oss-120b"
     
     return StreamingResponse(
         generate_groq_response(message.content, model_id),
