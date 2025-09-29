@@ -239,11 +239,139 @@ class ConversationPersistenceMigration(Migration):
         """)
 
 
+class EnhancedVectorFeaturesMigration(Migration):
+    """Add support for enhanced vector database features."""
+    
+    def __init__(self):
+        super().__init__("004", "Add enhanced vector database features support")
+    
+    async def up(self, connection):
+        """Add enhanced vector features support."""
+        await connection.execute("""
+            -- Add full-text search indexes for hybrid search
+            CREATE INDEX IF NOT EXISTS idx_documents_content_fts 
+            ON documents USING gin(to_tsvector('english', content));
+            
+            CREATE INDEX IF NOT EXISTS idx_documents_title_fts 
+            ON documents USING gin(to_tsvector('english', title));
+            
+            -- Add metadata indexes for filtering
+            CREATE INDEX IF NOT EXISTS idx_documents_metadata_gin 
+            ON documents USING gin(metadata);
+            
+            -- Add composite index for hybrid search performance
+            CREATE INDEX IF NOT EXISTS idx_documents_type_source_created 
+            ON documents(document_type, source, created_at DESC);
+            
+            -- Add function for text similarity scoring
+            CREATE OR REPLACE FUNCTION calculate_text_similarity(text1 TEXT, text2 TEXT)
+            RETURNS FLOAT AS $$
+            BEGIN
+                -- Simple word overlap similarity
+                RETURN (
+                    SELECT COUNT(*)::FLOAT / GREATEST(
+                        array_length(string_to_array(lower(text1), ' '), 1),
+                        array_length(string_to_array(lower(text2), ' '), 1),
+                        1
+                    )
+                    FROM (
+                        SELECT unnest(string_to_array(lower(text1), ' ')) AS word1
+                        INTERSECT
+                        SELECT unnest(string_to_array(lower(text2), ' ')) AS word2
+                    ) AS common_words
+                );
+            END;
+            $$ LANGUAGE plpgsql IMMUTABLE;
+            
+            -- Add table for semantic cache
+            CREATE TABLE IF NOT EXISTS semantic_cache (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                query_hash VARCHAR(64) NOT NULL UNIQUE,
+                query_text TEXT NOT NULL,
+                query_embedding VECTOR(1024),
+                response_data JSONB NOT NULL,
+                access_count INTEGER DEFAULT 1,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                last_accessed TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                expires_at TIMESTAMP WITH TIME ZONE DEFAULT (CURRENT_TIMESTAMP + INTERVAL '24 hours')
+            );
+            
+            -- Add indexes for semantic cache
+            CREATE INDEX IF NOT EXISTS idx_semantic_cache_hash ON semantic_cache(query_hash);
+            CREATE INDEX IF NOT EXISTS idx_semantic_cache_embedding ON semantic_cache 
+            USING ivfflat (query_embedding vector_cosine_ops) WITH (lists = 100);
+            CREATE INDEX IF NOT EXISTS idx_semantic_cache_expires ON semantic_cache(expires_at);
+            CREATE INDEX IF NOT EXISTS idx_semantic_cache_access_count ON semantic_cache(access_count DESC);
+            
+            -- Add table for document clusters
+            CREATE TABLE IF NOT EXISTS document_clusters (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                cluster_id INTEGER NOT NULL,
+                document_id INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+                cluster_label VARCHAR(255),
+                cluster_keywords JSONB DEFAULT '[]'::jsonb,
+                similarity_score FLOAT DEFAULT 0.0,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+            
+            -- Add indexes for document clusters
+            CREATE INDEX IF NOT EXISTS idx_document_clusters_cluster_id ON document_clusters(cluster_id);
+            CREATE INDEX IF NOT EXISTS idx_document_clusters_document_id ON document_clusters(document_id);
+            CREATE INDEX IF NOT EXISTS idx_document_clusters_similarity ON document_clusters(similarity_score DESC);
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_document_clusters_unique ON document_clusters(document_id, cluster_id);
+            
+            -- Add trigger to update semantic cache last_accessed
+            CREATE OR REPLACE FUNCTION update_cache_access()
+            RETURNS TRIGGER AS $$
+            BEGIN
+                NEW.last_accessed = CURRENT_TIMESTAMP;
+                NEW.access_count = NEW.access_count + 1;
+                RETURN NEW;
+            END;
+            $$ LANGUAGE plpgsql;
+            
+            CREATE TRIGGER trigger_update_cache_access
+                BEFORE UPDATE ON semantic_cache
+                FOR EACH ROW
+                EXECUTE FUNCTION update_cache_access();
+            
+            -- Add function to clean expired cache entries
+            CREATE OR REPLACE FUNCTION clean_expired_cache()
+            RETURNS INTEGER AS $$
+            DECLARE
+                deleted_count INTEGER;
+            BEGIN
+                DELETE FROM semantic_cache WHERE expires_at < CURRENT_TIMESTAMP;
+                GET DIAGNOSTICS deleted_count = ROW_COUNT;
+                RETURN deleted_count;
+            END;
+            $$ LANGUAGE plpgsql;
+        """)
+    
+    async def down(self, connection):
+        """Remove enhanced vector features support."""
+        await connection.execute("""
+            DROP TRIGGER IF EXISTS trigger_update_cache_access ON semantic_cache;
+            DROP FUNCTION IF EXISTS update_cache_access();
+            DROP FUNCTION IF EXISTS clean_expired_cache();
+            DROP FUNCTION IF EXISTS calculate_text_similarity(TEXT, TEXT);
+            
+            DROP TABLE IF EXISTS document_clusters CASCADE;
+            DROP TABLE IF EXISTS semantic_cache CASCADE;
+            
+            DROP INDEX IF EXISTS idx_documents_content_fts;
+            DROP INDEX IF EXISTS idx_documents_title_fts;
+            DROP INDEX IF EXISTS idx_documents_metadata_gin;
+            DROP INDEX IF EXISTS idx_documents_type_source_created;
+        """)
+
+
 class AnalyticsTablesMigration(Migration):
     """Add analytics tables for conversation tracking and insights."""
     
     def __init__(self):
-        super().__init__("004", "Add analytics tables for conversation tracking and insights")
+        super().__init__("005", "Add analytics tables for conversation tracking and insights")
     
     async def up(self, connection):
         """Create analytics tables."""
@@ -452,6 +580,7 @@ migration_manager = MigrationManager()
 migration_manager.add_migration(InitialMigration())
 migration_manager.add_migration(AddDocumentIndexesMigration())
 migration_manager.add_migration(ConversationPersistenceMigration())
+migration_manager.add_migration(EnhancedVectorFeaturesMigration())
 migration_manager.add_migration(AnalyticsTablesMigration())
 
 
