@@ -11,6 +11,7 @@ from app.enhanced_chat_router import router as enhanced_chat_router
 from app.external_apis_router import router as external_apis_router
 from app.ai.endpoints import router as ai_router
 from app.vector.router import router as vector_router
+from app.analytics.router import router as analytics_router
 from app.api.health import router as health_router
 from app.api.security import router as security_router
 from app.database.connection import initialize_database, close_database
@@ -128,6 +129,10 @@ app = FastAPI(
         {
             "name": "security",
             "description": "Security and rate limiting endpoints"
+        },
+        {
+            "name": "analytics",
+            "description": "Conversation analytics and insights"
         }
     ]
 )
@@ -158,6 +163,7 @@ app.include_router(security_router, prefix="/api", tags=["security"])
 app.include_router(auth_router, prefix="/api/auth", tags=["authentication"])
 app.include_router(ai_router, prefix="/api/ai", tags=["ai_models"])
 app.include_router(enhanced_chat_router, prefix="/api/chat", tags=["enhanced_chat"])
+app.include_router(analytics_router, prefix="/api", tags=["analytics"])
 app.include_router(external_apis_router, prefix="/api/external", tags=["external_apis"])
 app.include_router(vector_router, prefix="/api", tags=["vector"])
 # Original chat router as fallback
@@ -198,13 +204,18 @@ async def api_status():
             "Structured logging for all API calls",
             "Health checks for all services",
             "Retry logic with exponential backoff",
-            "Graceful degradation when services fail"
+            "Graceful degradation when services fail",
+            "Advanced conversation analytics and insights",
+            "User engagement metrics and quality scoring",
+            "Performance monitoring and response time tracking",
+            "Context usage analytics and API usage statistics"
         ],
         "endpoints": {
             "health": "/api/health/*",
             "auth": "/api/auth/*",
             "ai": "/api/ai/*",
             "enhanced_chat": "/api/chat/*",
+            "analytics": "/api/analytics/*",
             "basic_chat": "/api/chat/basic/*",
             "external": "/api/external/*",
             "vector": "/api/vector/*",

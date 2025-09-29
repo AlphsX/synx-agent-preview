@@ -239,6 +239,212 @@ class ConversationPersistenceMigration(Migration):
         """)
 
 
+class AnalyticsTablesMigration(Migration):
+    """Add analytics tables for conversation tracking and insights."""
+    
+    def __init__(self):
+        super().__init__("004", "Add analytics tables for conversation tracking and insights")
+    
+    async def up(self, connection):
+        """Create analytics tables."""
+        await connection.execute("""
+            -- Conversation analytics table
+            CREATE TABLE IF NOT EXISTS conversation_analytics (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                conversation_id UUID NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                
+                -- Message counts
+                total_messages INTEGER DEFAULT 0,
+                user_messages INTEGER DEFAULT 0,
+                assistant_messages INTEGER DEFAULT 0,
+                
+                -- Response time metrics (in milliseconds)
+                avg_response_time FLOAT DEFAULT 0.0,
+                min_response_time FLOAT DEFAULT 0.0,
+                max_response_time FLOAT DEFAULT 0.0,
+                total_response_time FLOAT DEFAULT 0.0,
+                
+                -- Context usage tracking
+                context_types_used JSONB DEFAULT '[]'::jsonb,
+                external_apis_called JSONB DEFAULT '[]'::jsonb,
+                context_usage_count INTEGER DEFAULT 0,
+                
+                -- Model usage
+                models_used JSONB DEFAULT '[]'::jsonb,
+                primary_model VARCHAR(100),
+                model_switches INTEGER DEFAULT 0,
+                
+                -- Engagement metrics
+                conversation_duration FLOAT DEFAULT 0.0,
+                user_engagement_score FLOAT DEFAULT 0.0,
+                conversation_quality_score FLOAT DEFAULT 0.0,
+                
+                -- Token usage
+                total_tokens_used INTEGER DEFAULT 0,
+                input_tokens INTEGER DEFAULT 0,
+                output_tokens INTEGER DEFAULT 0,
+                
+                -- Error tracking
+                error_count INTEGER DEFAULT 0,
+                fallback_usage_count INTEGER DEFAULT 0,
+                
+                -- Timestamps
+                first_message_at TIMESTAMP WITH TIME ZONE,
+                last_message_at TIMESTAMP WITH TIME ZONE,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+            
+            -- Message analytics table
+            CREATE TABLE IF NOT EXISTS message_analytics (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                message_id UUID NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+                conversation_id UUID NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                
+                -- Message metrics
+                message_length INTEGER DEFAULT 0,
+                word_count INTEGER DEFAULT 0,
+                sentence_count INTEGER DEFAULT 0,
+                
+                -- Processing metrics
+                processing_time FLOAT DEFAULT 0.0,
+                context_fetch_time FLOAT DEFAULT 0.0,
+                ai_response_time FLOAT DEFAULT 0.0,
+                
+                -- Context usage for this message
+                context_data_used JSONB DEFAULT '{}'::jsonb,
+                external_apis_used JSONB DEFAULT '[]'::jsonb,
+                
+                -- Quality metrics
+                user_rating INTEGER CHECK (user_rating >= 1 AND user_rating <= 5),
+                auto_quality_score FLOAT DEFAULT 0.0,
+                
+                -- Token usage for this message
+                tokens_used INTEGER DEFAULT 0,
+                input_tokens INTEGER DEFAULT 0,
+                output_tokens INTEGER DEFAULT 0,
+                
+                -- Error tracking
+                had_errors BOOLEAN DEFAULT FALSE,
+                error_details JSONB DEFAULT '{}'::jsonb,
+                used_fallback BOOLEAN DEFAULT FALSE,
+                
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+            
+            -- User engagement metrics table
+            CREATE TABLE IF NOT EXISTS user_engagement_metrics (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                
+                -- Time period for these metrics
+                period_type VARCHAR(20) NOT NULL CHECK (period_type IN ('daily', 'weekly', 'monthly')),
+                period_start TIMESTAMP WITH TIME ZONE NOT NULL,
+                period_end TIMESTAMP WITH TIME ZONE NOT NULL,
+                
+                -- Conversation metrics
+                total_conversations INTEGER DEFAULT 0,
+                active_conversations INTEGER DEFAULT 0,
+                avg_conversation_length FLOAT DEFAULT 0.0,
+                
+                -- Message metrics
+                total_messages_sent INTEGER DEFAULT 0,
+                total_messages_received INTEGER DEFAULT 0,
+                avg_message_length FLOAT DEFAULT 0.0,
+                
+                -- Usage patterns
+                most_used_model VARCHAR(100),
+                favorite_context_types JSONB DEFAULT '[]'::jsonb,
+                peak_usage_hour INTEGER CHECK (peak_usage_hour >= 0 AND peak_usage_hour <= 23),
+                
+                -- Engagement scores
+                overall_engagement_score FLOAT DEFAULT 0.0,
+                conversation_quality_avg FLOAT DEFAULT 0.0,
+                user_satisfaction_score FLOAT DEFAULT 0.0,
+                
+                -- Feature usage
+                search_tool_usage JSONB DEFAULT '{}'::jsonb,
+                model_usage JSONB DEFAULT '{}'::jsonb,
+                
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+            
+            -- System analytics table
+            CREATE TABLE IF NOT EXISTS system_analytics (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                
+                -- Time period
+                period_type VARCHAR(20) NOT NULL CHECK (period_type IN ('hourly', 'daily', 'weekly')),
+                period_start TIMESTAMP WITH TIME ZONE NOT NULL,
+                period_end TIMESTAMP WITH TIME ZONE NOT NULL,
+                
+                -- Usage metrics
+                total_conversations INTEGER DEFAULT 0,
+                total_messages INTEGER DEFAULT 0,
+                unique_users INTEGER DEFAULT 0,
+                
+                -- Performance metrics
+                avg_response_time FLOAT DEFAULT 0.0,
+                avg_context_fetch_time FLOAT DEFAULT 0.0,
+                system_uptime_percentage FLOAT DEFAULT 100.0,
+                
+                -- API usage
+                external_api_calls JSONB DEFAULT '{}'::jsonb,
+                api_success_rate FLOAT DEFAULT 100.0,
+                api_error_count INTEGER DEFAULT 0,
+                
+                -- Model usage distribution
+                model_usage_distribution JSONB DEFAULT '{}'::jsonb,
+                most_popular_model VARCHAR(100),
+                
+                -- Context usage
+                context_type_usage JSONB DEFAULT '{}'::jsonb,
+                search_query_count INTEGER DEFAULT 0,
+                crypto_data_requests INTEGER DEFAULT 0,
+                
+                -- Error tracking
+                total_errors INTEGER DEFAULT 0,
+                error_types JSONB DEFAULT '{}'::jsonb,
+                fallback_usage INTEGER DEFAULT 0,
+                
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+            
+            -- Create indexes for analytics tables
+            CREATE INDEX IF NOT EXISTS idx_conversation_analytics_conversation_id ON conversation_analytics(conversation_id);
+            CREATE INDEX IF NOT EXISTS idx_conversation_analytics_user_id ON conversation_analytics(user_id) WHERE user_id IS NOT NULL;
+            CREATE INDEX IF NOT EXISTS idx_conversation_analytics_created_at ON conversation_analytics(created_at);
+            
+            CREATE INDEX IF NOT EXISTS idx_message_analytics_message_id ON message_analytics(message_id);
+            CREATE INDEX IF NOT EXISTS idx_message_analytics_conversation_id ON message_analytics(conversation_id);
+            CREATE INDEX IF NOT EXISTS idx_message_analytics_user_id ON message_analytics(user_id) WHERE user_id IS NOT NULL;
+            CREATE INDEX IF NOT EXISTS idx_message_analytics_created_at ON message_analytics(created_at);
+            
+            CREATE INDEX IF NOT EXISTS idx_user_engagement_user_id ON user_engagement_metrics(user_id);
+            CREATE INDEX IF NOT EXISTS idx_user_engagement_period ON user_engagement_metrics(period_type, period_start, period_end);
+            
+            CREATE INDEX IF NOT EXISTS idx_system_analytics_period ON system_analytics(period_type, period_start, period_end);
+            
+            -- Create unique constraints
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_conversation_analytics_unique ON conversation_analytics(conversation_id);
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_message_analytics_unique ON message_analytics(message_id);
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_user_engagement_unique ON user_engagement_metrics(user_id, period_type, period_start);
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_system_analytics_unique ON system_analytics(period_type, period_start);
+        """)
+    
+    async def down(self, connection):
+        """Drop analytics tables."""
+        await connection.execute("""
+            DROP TABLE IF EXISTS system_analytics CASCADE;
+            DROP TABLE IF EXISTS user_engagement_metrics CASCADE;
+            DROP TABLE IF EXISTS message_analytics CASCADE;
+            DROP TABLE IF EXISTS conversation_analytics CASCADE;
+        """)
+
+
 # Global migration manager
 migration_manager = MigrationManager()
 
@@ -246,6 +452,7 @@ migration_manager = MigrationManager()
 migration_manager.add_migration(InitialMigration())
 migration_manager.add_migration(AddDocumentIndexesMigration())
 migration_manager.add_migration(ConversationPersistenceMigration())
+migration_manager.add_migration(AnalyticsTablesMigration())
 
 
 # Convenience functions

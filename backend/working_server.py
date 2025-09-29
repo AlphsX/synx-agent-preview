@@ -34,7 +34,7 @@ app.add_middleware(
 # Models
 class ChatMessage(BaseModel):
     content: str
-    role: str
+    role: str = "user"  # Default to user role
     model_id: Optional[str] = None
 
 class AIModel(BaseModel):

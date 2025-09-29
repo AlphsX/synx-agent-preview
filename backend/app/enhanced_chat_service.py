@@ -7,6 +7,7 @@ import redis.asyncio as redis
 from datetime import datetime, timedelta
 import hashlib
 import logging
+import time
 from app.config import settings
 from app.external_apis.search_service import search_service
 from app.external_apis.binance import BinanceService
@@ -73,6 +74,11 @@ class EnhancedChatService:
                                  user_context: Optional[Dict[str, Any]] = None) -> AsyncGenerator[str, None]:
         """Generate AI response with enhanced context from external APIs and conversation history"""
         
+        start_time = time.time()
+        context_fetch_start = time.time()
+        had_errors = False
+        error_details = {}
+        
         try:
             # Set default user context if not provided
             if user_context is None:
@@ -91,6 +97,7 @@ class EnhancedChatService:
             
             # Analyze message for external data needs with intelligent context detection
             enhanced_context = await self._get_enhanced_context(message, user_context)
+            context_fetch_time = (time.time() - context_fetch_start) * 1000  # Convert to milliseconds
             
             # Build system message with enhanced context and user information
             system_message = self._build_enhanced_system_message(enhanced_context, user_context)
@@ -101,27 +108,64 @@ class EnhancedChatService:
             messages.append({"role": "user", "content": message})
             
             # Store user message in database with user context
+            user_message_id = None
             if conversation_id:
-                await self._store_user_message(conversation_id, message, user_context)
+                user_message_id = await self._store_user_message(conversation_id, message, user_context)
             
             # Generate response using AI service with router
+            ai_start_time = time.time()
             response_content = ""
-            async for chunk in self.ai_service.chat(
-                messages=messages,
-                model_id=model_id,
-                stream=True,
-                temperature=0.7,
-                max_tokens=2000
-            ):
-                response_content += chunk
-                yield chunk
+            token_count = 0
+            
+            try:
+                async for chunk in self.ai_service.chat(
+                    messages=messages,
+                    model_id=model_id,
+                    stream=True,
+                    temperature=0.7,
+                    max_tokens=2000
+                ):
+                    response_content += chunk
+                    token_count += len(chunk.split())  # Rough token estimation
+                    yield chunk
+            except Exception as ai_error:
+                had_errors = True
+                error_details = {"ai_service_error": str(ai_error), "used_fallback": True}
+                logger.error(f"AI service error: {ai_error}")
+                # Fallback to mock response
+                async for chunk in self._generate_enhanced_mock_response(message, enhanced_context):
+                    response_content += chunk
+                    yield chunk
+            
+            ai_response_time = (time.time() - ai_start_time) * 1000
+            total_processing_time = (time.time() - start_time) * 1000
             
             # Store AI response and cache the conversation if we have an ID
+            assistant_message_id = None
             if conversation_id:
-                await self._store_ai_response(conversation_id, response_content, model_id, enhanced_context, user_context)
-                await self._cache_conversation_message(conversation_id, message, response_content, model_id, enhanced_context, user_context)
+                assistant_message_id = await self._store_ai_response(
+                    conversation_id, response_content, model_id, enhanced_context, user_context
+                )
+                await self._cache_conversation_message(
+                    conversation_id, message, response_content, model_id, enhanced_context, user_context
+                )
+            
+            # Track analytics for both messages (non-blocking)
+            if conversation_id:
+                try:
+                    await self._track_message_analytics(
+                        user_message_id, assistant_message_id, conversation_id,
+                        user_context.get("user_id"), total_processing_time,
+                        context_fetch_time, ai_response_time, enhanced_context,
+                        token_count, had_errors, error_details
+                    )
+                except Exception as analytics_error:
+                    # Don't let analytics errors break the main chat flow
+                    logger.warning(f"Analytics tracking failed: {analytics_error}")
                 
         except Exception as e:
+            had_errors = True
+            error_details = {"general_error": str(e)}
             logger.error(f"Error in generate_ai_response: {e}")
             # Fallback to enhanced mock response
             async for chunk in self._generate_enhanced_mock_response(message, {}):
@@ -442,15 +486,17 @@ class EnhancedChatService:
                     "is_authenticated": user_context.get("is_authenticated", False)
                 }
             
-            await conversation_service.add_message(
+            message_obj = await conversation_service.add_message(
                 conversation_id=conversation_id,
                 content=message,
                 role="user",
                 metadata=metadata
             )
             logger.info(f"Stored user message in conversation {conversation_id} for user {user_context.get('username', 'anonymous')}")
+            return str(message_obj.id) if message_obj else None
         except Exception as e:
             logger.error(f"Error storing user message: {e}")
+            return None
     
     async def _store_ai_response(self, conversation_id: str, response: str, model_id: str, context: Dict[str, Any], user_context: Dict[str, Any] = None):
         """Store AI response in database with context data"""
@@ -466,7 +512,7 @@ class EnhancedChatService:
                 }
             }
             
-            await conversation_service.add_message(
+            message_obj = await conversation_service.add_message(
                 conversation_id=conversation_id,
                 content=response,
                 role="assistant",
@@ -474,22 +520,30 @@ class EnhancedChatService:
                 context_data=context_summary
             )
             logger.info(f"Stored AI response in conversation {conversation_id} for user {user_context.get('username', 'anonymous') if user_context else 'anonymous'}")
+            return str(message_obj.id) if message_obj else None
         except Exception as e:
             logger.error(f"Error storing AI response: {e}")
+            return None
     
     def _extract_providers_from_context(self, context: Dict[str, Any]) -> List[str]:
         """Extract provider information from context data"""
         providers = []
         
-        if context.get("web_search", {}).get("provider"):
-            providers.append(context["web_search"]["provider"])
+        # Safely extract web search provider
+        web_search = context.get("web_search") or {}
+        if web_search.get("provider"):
+            providers.append(web_search["provider"])
         
-        if context.get("news", {}).get("provider"):
-            providers.append(context["news"]["provider"])
+        # Safely extract news provider
+        news = context.get("news") or {}
+        if news.get("provider"):
+            providers.append(news["provider"])
         
+        # Check for crypto data
         if context.get("crypto_data"):
             providers.append("Binance")
         
+        # Check for vector search
         if context.get("vector_search"):
             providers.append("Vector Database")
         
@@ -692,6 +746,154 @@ class EnhancedChatService:
         except Exception as e:
             logger.error(f"Error getting user conversations: {e}")
             return []
+    
+    async def _track_message_analytics(
+        self,
+        user_message_id: Optional[str],
+        assistant_message_id: Optional[str],
+        conversation_id: str,
+        user_id: Optional[int],
+        total_processing_time: float,
+        context_fetch_time: float,
+        ai_response_time: float,
+        context_data: Dict[str, Any],
+        token_count: int,
+        had_errors: bool,
+        error_details: Dict[str, Any]
+    ):
+        """Track analytics for messages (async background task)"""
+        try:
+            # Use safe analytics service to avoid breaking chat flow
+            from app.analytics.service_safe import safe_analytics_service
+            
+            # Track analytics for assistant message (the one with processing metrics)
+            if assistant_message_id:
+                await safe_analytics_service.track_message_analytics(
+                    message_id=assistant_message_id,
+                    conversation_id=conversation_id,
+                    user_id=user_id,
+                    processing_time=total_processing_time,
+                    context_data=context_data,
+                    tokens_used=token_count,
+                    had_errors=had_errors,
+                    error_details=error_details
+                )
+            
+            # Track basic analytics for user message if needed
+            if user_message_id:
+                await safe_analytics_service.track_message_analytics(
+                    message_id=user_message_id,
+                    conversation_id=conversation_id,
+                    user_id=user_id,
+                    processing_time=0.0,  # User messages don't have processing time
+                    context_data={},
+                    tokens_used=0,
+                    had_errors=False,
+                    error_details={}
+                )
+                
+        except Exception as e:
+            # Don't let analytics errors break the main flow
+            logger.warning(f"Analytics tracking failed gracefully: {e}")
+    
+    async def get_available_models(self) -> List[Dict[str, Any]]:
+        """Get available AI models with enhanced capabilities"""
+        try:
+            models = await self.ai_service.get_available_models()
+            
+            # Add enhanced capabilities info to each model
+            enhanced_models = []
+            for model in models:
+                enhanced_model = {
+                    **model,
+                    "enhanced_features": [
+                        "real_time_web_search",
+                        "cryptocurrency_data",
+                        "news_updates",
+                        "vector_knowledge_search",
+                        "conversation_history",
+                        "intelligent_context_detection",
+                        "analytics_tracking"
+                    ]
+                }
+                enhanced_models.append(enhanced_model)
+            
+            return enhanced_models
+            
+        except Exception as e:
+            logger.error(f"Error getting available models: {e}")
+            return []
+    
+    async def get_service_status(self) -> Dict[str, Any]:
+        """Get comprehensive status of all enhanced chat services"""
+        try:
+            status = {
+                "ai_service": {
+                    "available": True,
+                    "models_count": len(await self.get_available_models()),
+                    "status": "operational"
+                },
+                "search_service": {
+                    "available": True,
+                    "providers": await self.search_service.get_provider_status(),
+                    "status": "operational"
+                },
+                "crypto_service": {
+                    "available": self.binance_service.is_available(),
+                    "status": "operational" if self.binance_service.is_available() else "unavailable"
+                },
+                "vector_service": {
+                    "available": True,  # Assume available for now
+                    "status": "operational"
+                },
+                "redis_cache": {
+                    "available": self.redis_client is not None,
+                    "status": "operational" if self.redis_client else "unavailable"
+                },
+                "analytics": {
+                    "available": True,
+                    "tracking_enabled": True,
+                    "status": "operational"
+                }
+            }
+            
+            return status
+            
+        except Exception as e:
+            logger.error(f"Error getting service status: {e}")
+            return {"error": str(e)}
+    
+    async def get_conversation_with_messages(
+        self, 
+        conversation_id: str, 
+        limit: int = 50
+    ) -> Optional[Dict[str, Any]]:
+        """Get conversation with messages and analytics"""
+        try:
+            conversation = await self.get_conversation(conversation_id)
+            if not conversation:
+                return None
+            
+            # Get messages
+            messages = await conversation_service.get_conversation_messages(
+                conversation_id=conversation_id,
+                limit=limit,
+                include_context=True
+            )
+            
+            # Get analytics summary
+            summary = await self.get_conversation_summary(conversation_id)
+            
+            return {
+                **conversation,
+                "messages": messages,
+                "summary": summary,
+                "analytics_available": True
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting conversation with messages: {e}")
+            return None
     
     async def get_conversation_with_messages(self, conversation_id: str, limit: int = 50) -> Optional[Dict[str, Any]]:
         """Get conversation with its messages"""

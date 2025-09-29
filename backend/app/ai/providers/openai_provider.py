@@ -277,9 +277,9 @@ class OpenAIProvider(BaseAIProvider):
             )
             
             async for chunk in stream_response:
-                if chunk.choices:
+                if chunk.choices and len(chunk.choices) > 0:
                     choice = chunk.choices[0]
-                    if choice.delta and choice.delta.content:
+                    if choice and choice.delta and choice.delta.content:
                         yield StreamChunk(
                             content=choice.delta.content,
                             model_id=model_id,
@@ -316,9 +316,9 @@ class OpenAIProvider(BaseAIProvider):
                 **params
             )
             
-            if response.choices:
+            if response.choices and len(response.choices) > 0:
                 choice = response.choices[0]
-                content = choice.message.content or ""
+                content = choice.message.content or "" if choice and choice.message else ""
                 
                 yield StreamChunk(
                     content=content,

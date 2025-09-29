@@ -350,11 +350,21 @@ class GroqProvider(BaseAIProvider):
                     try:
                         data = json.loads(data_text)
                         choices = data.get('choices', [])
-                        if choices:
+                        if choices and len(choices) > 0:
                             choice = choices[0]
-                            delta = choice.get('delta', {})
-                            content = delta.get('content', '')
-                            finish_reason = choice.get('finish_reason')
+                            if choice:
+                                delta = choice.get('delta', {})
+                                content = delta.get('content', '')
+                                finish_reason = choice.get('finish_reason')
+                                
+                                if content:
+                                    yield StreamChunk(
+                                        content=content,
+                                        model_id=model_id,
+                                        provider="groq",
+                                        finish_reason=finish_reason,
+                                        done=finish_reason is not None
+                                    )
                             
                             if content:
                                 yield StreamChunk(
@@ -375,9 +385,10 @@ class GroqProvider(BaseAIProvider):
         """Process non-streaming response from Groq API"""
         data = await response.json()
         choices = data.get('choices', [])
-        if choices:
-            content = choices[0].get('message', {}).get('content', '')
-            finish_reason = choices[0].get('finish_reason')
+        if choices and len(choices) > 0:
+            choice = choices[0]
+            content = choice.get('message', {}).get('content', '') if choice else ''
+            finish_reason = choice.get('finish_reason') if choice else None
             
             yield StreamChunk(
                 content=content,

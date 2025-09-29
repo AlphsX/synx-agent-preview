@@ -123,6 +123,40 @@ export const chatAPI = {
       console.error('Error fetching search tools:', error);
       throw error;
     }
+  },
+
+  // Get chat capabilities from the backend
+  getChatCapabilities: async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/chat/capabilities`);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch capabilities: ${response.status} ${response.statusText}`);
+      }
+      
+      const capabilities = await response.json();
+      return capabilities;
+    } catch (error) {
+      console.error('Error fetching capabilities:', error);
+      throw error;
+    }
+  },
+
+  // Get service status from the backend
+  getServiceStatus: async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/chat/status`);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch service status: ${response.status} ${response.statusText}`);
+      }
+      
+      const status = await response.json();
+      return status;
+    } catch (error) {
+      console.error('Error fetching service status:', error);
+      throw error;
+    }
   }
 };
 

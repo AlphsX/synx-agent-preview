@@ -200,16 +200,25 @@ export const AIModelDropdown = ({
           </span>
         </div>
         <div className="flex items-center space-x-1">
-          <button
+          <div
             onClick={(e) => {
               e.stopPropagation();
               refreshModels();
             }}
-            className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+            className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors cursor-pointer"
             title="Refresh models"
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                e.stopPropagation();
+                refreshModels();
+              }
+            }}
           >
             <RefreshCw className={`h-3 w-3 text-gray-500 ${isLoading ? 'animate-spin' : ''}`} />
-          </button>
+          </div>
           <ChevronDown
             className={`h-4 w-4 text-gray-500 transition-transform duration-200 ${
               isOpen ? "rotate-180" : ""

@@ -86,9 +86,14 @@ class ExternalAPIValidator:
             ) as response:
                 if response.status == 200:
                     data = await response.json()
-                    content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
-                    self.log_result("Groq AI API", True, f"Response received: {content[:50]}...", {"model": "llama-3.1-8b-instant"})
-                    return True
+                    choices = data.get("choices", [])
+                    if choices and len(choices) > 0:
+                        content = choices[0].get("message", {}).get("content", "")
+                        self.log_result("Groq AI API", True, f"Response received: {content[:50]}...", {"model": "llama-3.1-8b-instant"})
+                        return True
+                    else:
+                        self.log_result("Groq AI API", False, "No choices in API response")
+                        return False
                 else:
                     error_text = await response.text()
                     self.log_result("Groq AI API", False, f"HTTP {response.status}: {error_text[:100]}")
