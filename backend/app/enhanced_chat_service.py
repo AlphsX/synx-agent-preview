@@ -11,7 +11,8 @@ import time
 from app.config import settings
 from app.external_apis.search_service import search_service
 from app.external_apis.binance import BinanceService
-from app.ai.service import AIService
+from app.external_apis.unified_service import unified_service
+from app.ai.enhanced_service import EnhancedAIService
 from app.vector.service import vector_service
 from app.conversation_service import conversation_service
 from app.auth.schemas import UserResponse
@@ -20,10 +21,11 @@ logger = logging.getLogger(__name__)
 
 class EnhancedChatService:
     def __init__(self):
-        self.ai_service = AIService()
+        self.ai_service = EnhancedAIService()
         self.search_service = search_service
         self.binance_service = BinanceService()
         self.vector_service = vector_service
+        self.unified_service = unified_service
         
         # Redis for conversation history caching
         self.redis_client = None
@@ -172,7 +174,27 @@ class EnhancedChatService:
                 yield chunk
     
     async def _get_enhanced_context(self, message: str, user_context: Dict[str, Any] = None) -> Dict[str, Any]:
-        """Intelligent context detection and data retrieval from multiple sources"""
+        """Intelligent context detection and data retrieval from multiple sources using unified service"""
+        try:
+            # Use the unified service for enhanced context detection and fetching
+            enhanced_context = await self.unified_service.get_enhanced_context(message)
+            
+            # Also check for vector search needs
+            if self._needs_vector_search(message.lower()):
+                vector_context = await self._fetch_vector_context(message)
+                if vector_context:
+                    enhanced_context.update(vector_context)
+            
+            logger.info(f"Enhanced context gathered: {list(enhanced_context.keys())}")
+            return enhanced_context
+        
+        except Exception as e:
+            logger.error(f"Enhanced context fetching failed: {str(e)}")
+            # Fallback to original method
+            return await self._get_enhanced_context_fallback(message, user_context)
+    
+    async def _get_enhanced_context_fallback(self, message: str, user_context: Dict[str, Any] = None) -> Dict[str, Any]:
+        """Fallback context detection method"""
         context = {}
         message_lower = message.lower()
         
@@ -208,7 +230,7 @@ class EnhancedChatService:
                 elif isinstance(result, Exception):
                     logger.warning(f"Context fetching error: {result}")
         
-        logger.info(f"Enhanced context gathered: {list(context.keys())}")
+        logger.info(f"Enhanced context gathered (fallback): {list(context.keys())}")
         return context
     
     def _needs_web_search(self, message: str) -> bool:
