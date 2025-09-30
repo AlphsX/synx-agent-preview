@@ -2,15 +2,12 @@
 
 import { useState, useEffect, useRef } from "react";
 import {
-  Send,
   Sparkles,
   Globe,
   TrendingUp,
   User,
   Mic,
   Plus,
-  Settings,
-  MoreHorizontal,
   Zap,
   ChevronLeft,
   ChevronRight,
@@ -29,6 +26,9 @@ import {
   testStreamingChat,
 } from "@/lib/test-enhanced-api";
 import { StreamingRenderer } from "@/components/chat/StreamingRenderer";
+import { MessageRenderer } from "@/components/chat/MessageRenderer";
+import { EnhancedMessage, FormattingMetadata } from "@/types/markdown";
+import { analyzeMarkdownFeatures } from "@/lib/markdown-utils";
 
 // Type definitions for SpeechRecognition API
 interface SpeechRecognitionEvent extends Event {
@@ -86,13 +86,10 @@ declare global {
   }
 }
 
-interface Message {
-  id: string;
-  content: string;
-  role: "user" | "assistant";
-  timestamp: Date;
+interface Message extends Omit<EnhancedMessage, 'formattingMetadata'> {
   model?: string;
   isStreaming?: boolean;
+  formattingMetadata?: FormattingMetadata;
 }
 
 interface AIModel {
@@ -150,11 +147,22 @@ export default function Home() {
     // Hide welcome screen after first prompt submission
     setShowWelcome(false);
 
+    // Analyze user message for markdown features
+    const userMessageFeatures = analyzeMarkdownFeatures(inputText);
+    
     const userMessage: Message = {
       id: Date.now().toString(),
       content: inputText,
       role: "user",
       timestamp: new Date(),
+      formattingMetadata: {
+        hasHeaders: userMessageFeatures.hasHeaders,
+        hasLists: userMessageFeatures.hasLists,
+        hasTables: userMessageFeatures.hasTables,
+        hasLinks: userMessageFeatures.hasLinks,
+        hasBlockquotes: userMessageFeatures.hasBlockquotes,
+        estimatedReadTime: userMessageFeatures.estimatedReadTime
+      },
     };
 
     setMessages((prev) => [...prev, userMessage]);
@@ -171,6 +179,14 @@ export default function Home() {
       timestamp: new Date(),
       model: selectedModel,
       isStreaming: true,
+      formattingMetadata: {
+        hasHeaders: false,
+        hasLists: false,
+        hasTables: false,
+        hasLinks: false,
+        hasBlockquotes: false,
+        estimatedReadTime: 0
+      },
     };
 
     setMessages((prev) => [...prev, aiMessage]);
@@ -186,22 +202,50 @@ export default function Home() {
         // onChunk - update the AI message content as chunks arrive
         (chunk: string) => {
           setMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === aiMessageId
-                ? { ...msg, content: msg.content + chunk, isStreaming: true }
-                : msg
-            )
+            prev.map((msg) => {
+              if (msg.id === aiMessageId) {
+                const updatedContent = msg.content + chunk;
+                const updatedFeatures = analyzeMarkdownFeatures(updatedContent);
+                return { 
+                  ...msg, 
+                  content: updatedContent, 
+                  isStreaming: true,
+                  formattingMetadata: {
+                    hasHeaders: updatedFeatures.hasHeaders,
+                    hasLists: updatedFeatures.hasLists,
+                    hasTables: updatedFeatures.hasTables,
+                    hasLinks: updatedFeatures.hasLinks,
+                    hasBlockquotes: updatedFeatures.hasBlockquotes,
+                    estimatedReadTime: updatedFeatures.estimatedReadTime
+                  }
+                };
+              }
+              return msg;
+            })
           );
         },
         // onComplete - finalize the response
         (data: unknown) => {
           console.log("Enhanced chat stream completed:", data);
           setMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === aiMessageId
-                ? { ...msg, isStreaming: false }
-                : msg
-            )
+            prev.map((msg) => {
+              if (msg.id === aiMessageId) {
+                const finalFeatures = analyzeMarkdownFeatures(msg.content);
+                return { 
+                  ...msg, 
+                  isStreaming: false,
+                  formattingMetadata: {
+                    hasHeaders: finalFeatures.hasHeaders,
+                    hasLists: finalFeatures.hasLists,
+                    hasTables: finalFeatures.hasTables,
+                    hasLinks: finalFeatures.hasLinks,
+                    hasBlockquotes: finalFeatures.hasBlockquotes,
+                    estimatedReadTime: finalFeatures.estimatedReadTime
+                  }
+                };
+              }
+              return msg;
+            })
           );
           setIsLoading(false);
         },
@@ -209,17 +253,27 @@ export default function Home() {
         (error: string) => {
           console.error("Enhanced chat stream error:", error);
           setMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === aiMessageId
-                ? {
-                    ...msg,
-                    content:
-                      msg.content ||
-                      `Error: ${error}. This might be because the enhanced backend is not running or API keys are not configured. Please check the backend service and ensure it's running on the correct port.`,
-                    isStreaming: false,
-                  }
-                : msg
-            )
+            prev.map((msg) => {
+              if (msg.id === aiMessageId) {
+                const errorContent = msg.content ||
+                  `Error: ${error}. This might be because the enhanced backend is not running or API keys are not configured. Please check the backend service and ensure it's running on the correct port.`;
+                const errorFeatures = analyzeMarkdownFeatures(errorContent);
+                return {
+                  ...msg,
+                  content: errorContent,
+                  isStreaming: false,
+                  formattingMetadata: {
+                    hasHeaders: errorFeatures.hasHeaders,
+                    hasLists: errorFeatures.hasLists,
+                    hasTables: errorFeatures.hasTables,
+                    hasLinks: errorFeatures.hasLinks,
+                    hasBlockquotes: errorFeatures.hasBlockquotes,
+                    estimatedReadTime: errorFeatures.estimatedReadTime
+                  },
+                };
+              }
+              return msg;
+            })
           );
           setIsLoading(false);
         }
@@ -250,9 +304,25 @@ Please ensure the enhanced backend service is running on http://localhost:8000 a
 - PostgreSQL with pgvector (for knowledge search)`;
 
       setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === aiMessageId ? { ...msg, content: fallbackContent, isStreaming: false } : msg
-        )
+        prev.map((msg) => {
+          if (msg.id === aiMessageId) {
+            const fallbackFeatures = analyzeMarkdownFeatures(fallbackContent);
+            return { 
+              ...msg, 
+              content: fallbackContent, 
+              isStreaming: false,
+              formattingMetadata: {
+                hasHeaders: fallbackFeatures.hasHeaders,
+                hasLists: fallbackFeatures.hasLists,
+                hasTables: fallbackFeatures.hasTables,
+                hasLinks: fallbackFeatures.hasLinks,
+                hasBlockquotes: fallbackFeatures.hasBlockquotes,
+                estimatedReadTime: fallbackFeatures.estimatedReadTime
+              }
+            };
+          }
+          return msg;
+        })
       );
       setIsLoading(false);
     }
@@ -1264,9 +1334,16 @@ Please ensure the enhanced backend service is running on http://localhost:8000 a
                               }}
                             />
                           ) : (
-                            <p className="text-[15px] leading-relaxed">
-                              {message.content}
-                            </p>
+                            <MessageRenderer
+                              content={message.content}
+                              isStreaming={false}
+                              className="user-message-renderer"
+                              onCopyCode={(code) => {
+                                navigator.clipboard.writeText(code);
+                                // Could add a toast notification here
+                                console.log("Code copied to clipboard");
+                              }}
+                            />
                           )}
                           {message.role === "assistant" && message.model && (
                             <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700/50">

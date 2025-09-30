@@ -365,6 +365,74 @@
   @apply border-l-2 border-blue-500/30 pl-4;
 }
 
+/* User message specific styling */
+.user-message-renderer .markdown-content {
+  @apply text-white;
+}
+
+.user-message-renderer .markdown-content h1,
+.user-message-renderer .markdown-content h2,
+.user-message-renderer .markdown-content h3,
+.user-message-renderer .markdown-content h4,
+.user-message-renderer .markdown-content h5,
+.user-message-renderer .markdown-content h6 {
+  @apply text-white;
+  background: linear-gradient(135deg, #ffffff 0%, #e5e7eb 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.user-message-renderer .markdown-content p {
+  @apply text-white/90;
+}
+
+.user-message-renderer .markdown-content ul li,
+.user-message-renderer .markdown-content ol li {
+  @apply text-white/90;
+}
+
+.user-message-renderer .markdown-content ul li::before {
+  @apply text-white/70;
+}
+
+.user-message-renderer .markdown-content blockquote {
+  @apply border-l-4 border-white/30;
+  background: linear-gradient(135deg, 
+    rgba(255, 255, 255, 0.1) 0%, 
+    rgba(255, 255, 255, 0.05) 100%
+  );
+}
+
+.user-message-renderer .markdown-content blockquote p {
+  @apply text-white/80;
+}
+
+.user-message-renderer .markdown-content a {
+  @apply text-white hover:text-white/80;
+  @apply underline decoration-white/50 hover:decoration-white/80;
+}
+
+.user-message-renderer .markdown-content code:not(pre code) {
+  @apply bg-white/20 text-white border-white/30;
+}
+
+.user-message-renderer .markdown-content table {
+  @apply bg-white/10 border-white/20;
+}
+
+.user-message-renderer .markdown-content th {
+  @apply text-white bg-white/20 border-white/30;
+}
+
+.user-message-renderer .markdown-content td {
+  @apply text-white/90 border-white/20;
+}
+
+.user-message-renderer .markdown-content tbody tr:hover {
+  @apply bg-white/10;
+}
+
 /* Enhanced error display */
 .markdown-error {
   @apply p-4 border border-red-200 dark:border-red-800 rounded-lg;
