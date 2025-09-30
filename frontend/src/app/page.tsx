@@ -28,6 +28,7 @@ import {
   testEnhancedBackend,
   testStreamingChat,
 } from "@/lib/test-enhanced-api";
+import { StreamingRenderer } from "@/components/chat/StreamingRenderer";
 
 // Type definitions for SpeechRecognition API
 interface SpeechRecognitionEvent extends Event {
@@ -91,6 +92,7 @@ interface Message {
   role: "user" | "assistant";
   timestamp: Date;
   model?: string;
+  isStreaming?: boolean;
 }
 
 interface AIModel {
@@ -168,6 +170,7 @@ export default function Home() {
       role: "assistant",
       timestamp: new Date(),
       model: selectedModel,
+      isStreaming: true,
     };
 
     setMessages((prev) => [...prev, aiMessage]);
@@ -185,7 +188,7 @@ export default function Home() {
           setMessages((prev) =>
             prev.map((msg) =>
               msg.id === aiMessageId
-                ? { ...msg, content: msg.content + chunk }
+                ? { ...msg, content: msg.content + chunk, isStreaming: true }
                 : msg
             )
           );
@@ -193,6 +196,13 @@ export default function Home() {
         // onComplete - finalize the response
         (data: unknown) => {
           console.log("Enhanced chat stream completed:", data);
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === aiMessageId
+                ? { ...msg, isStreaming: false }
+                : msg
+            )
+          );
           setIsLoading(false);
         },
         // onError - handle errors
@@ -206,6 +216,7 @@ export default function Home() {
                     content:
                       msg.content ||
                       `Error: ${error}. This might be because the enhanced backend is not running or API keys are not configured. Please check the backend service and ensure it's running on the correct port.`,
+                    isStreaming: false,
                   }
                 : msg
             )
@@ -240,7 +251,7 @@ Please ensure the enhanced backend service is running on http://localhost:8000 a
 
       setMessages((prev) =>
         prev.map((msg) =>
-          msg.id === aiMessageId ? { ...msg, content: fallbackContent } : msg
+          msg.id === aiMessageId ? { ...msg, content: fallbackContent, isStreaming: false } : msg
         )
       );
       setIsLoading(false);
@@ -1243,9 +1254,20 @@ Please ensure the enhanced backend service is running on http://localhost:8000 a
                               : "bg-white dark:bg-gray-800/60 text-gray-900 dark:text-gray-100 border-gray-200/40 dark:border-gray-700/40"
                           }`}
                         >
-                          <p className="text-[15px] leading-relaxed">
-                            {message.content}
-                          </p>
+                          {message.role === "assistant" ? (
+                            <StreamingRenderer
+                              content={message.content}
+                              isComplete={!message.isStreaming}
+                              onContentUpdate={(renderedContent) => {
+                                // Optional: Update message with rendered content for caching
+                                console.log("Rendered content updated:", renderedContent);
+                              }}
+                            />
+                          ) : (
+                            <p className="text-[15px] leading-relaxed">
+                              {message.content}
+                            </p>
+                          )}
                           {message.role === "assistant" && message.model && (
                             <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700/50">
                               <div className="flex items-center justify-between">
