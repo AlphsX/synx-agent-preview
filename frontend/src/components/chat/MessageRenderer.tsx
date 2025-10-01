@@ -10,6 +10,7 @@ import { MarkdownErrorBoundary } from './MarkdownErrorBoundary';
 import { CodeBlock } from './CodeBlock';
 import { useMarkdownTheme } from '@/hooks/useMarkdownTheme';
 import { useComponentPerformanceMonitoring } from '@/hooks/usePerformanceMonitoring';
+import { JSX } from 'react/jsx-runtime';
 
 // Lazy load heavy components for better performance
 const LazyCodeBlock = lazy(() => import('./CodeBlock').then(module => ({ default: module.CodeBlock })));
@@ -210,7 +211,20 @@ export const MessageRenderer: React.FC<MessageRendererProps> = memo(({
   });
 
   // Use theme hook for consistent theming
-  const { theme, isDarkMode } = useMarkdownTheme();
+  const { isDarkMode } = useMarkdownTheme();
+
+  // Enhanced error handler with performance monitoring
+  const handleError = useCallback((error: any) => {
+    recordComponentError(error);
+    
+    // Report error to monitoring service in production
+    if (process.env.NODE_ENV === 'production' && (window as any).gtag) {
+      (window as any).gtag('event', 'exception', {
+        description: `MessageRenderer: ${error.message}`,
+        fatal: false
+      });
+    }
+  }, [recordComponentError]);
 
   // Memoized content parsing with enhanced error handling
   const { parsedContent, features, errors } = useMemo(() => {
@@ -243,19 +257,6 @@ export const MessageRenderer: React.FC<MessageRendererProps> = memo(({
       };
     }
   }, [content, handleError]);
-
-  // Enhanced error handler with performance monitoring
-  const handleError = useCallback((error: any) => {
-    recordComponentError(error);
-    
-    // Report error to monitoring service in production
-    if (process.env.NODE_ENV === 'production' && window.gtag) {
-      window.gtag('event', 'exception', {
-        description: `MessageRenderer: ${error.message}`,
-        fatal: false
-      });
-    }
-  }, [recordComponentError]);
 
   // Memoized copy handler
   const handleCopyCode = useCallback((code: string) => {
@@ -369,7 +370,6 @@ export const MessageRenderer: React.FC<MessageRendererProps> = memo(({
           <ReactMarkdown
             remarkPlugins={[remarkGfm]}
             components={components}
-            className="markdown-content markdown-fade-in"
             skipHtml={true} // Security: Skip HTML for safety
           >
             {parsedContent}
@@ -393,7 +393,7 @@ export const MessageRenderer: React.FC<MessageRendererProps> = memo(({
                   <span className="inline-block w-2 h-2 bg-yellow-400 rounded-full mt-2 mr-2 flex-shrink-0"></span>
                   <span>
                     <strong>{error.type}:</strong> {error.message}
-                    {error.line && <span className="text-xs ml-1">(line {error.line})</span>}
+                    {'line' in error && error.line && <span className="text-xs ml-1">(line {error.line})</span>}
                   </span>
                 </li>
               ))}

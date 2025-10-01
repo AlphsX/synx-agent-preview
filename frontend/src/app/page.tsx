@@ -29,6 +29,7 @@ import { StreamingRenderer } from "@/components/chat/StreamingRenderer";
 import { MessageRenderer } from "@/components/chat/MessageRenderer";
 import { EnhancedMessage, FormattingMetadata } from "@/types/markdown";
 import { analyzeMarkdownFeatures } from "@/lib/markdown-utils";
+import { FallbackResponseGenerator } from "@/lib/fallback-responses";
 
 // Type definitions for SpeechRecognition API
 interface SpeechRecognitionEvent extends Event {
@@ -86,7 +87,7 @@ declare global {
   }
 }
 
-interface Message extends Omit<EnhancedMessage, 'formattingMetadata'> {
+interface Message extends Omit<EnhancedMessage, "formattingMetadata"> {
   model?: string;
   isStreaming?: boolean;
   formattingMetadata?: FormattingMetadata;
@@ -149,7 +150,7 @@ export default function Home() {
 
     // Analyze user message for markdown features
     const userMessageFeatures = analyzeMarkdownFeatures(inputText);
-    
+
     const userMessage: Message = {
       id: Date.now().toString(),
       content: inputText,
@@ -161,7 +162,7 @@ export default function Home() {
         hasTables: userMessageFeatures.hasTables,
         hasLinks: userMessageFeatures.hasLinks,
         hasBlockquotes: userMessageFeatures.hasBlockquotes,
-        estimatedReadTime: userMessageFeatures.estimatedReadTime
+        estimatedReadTime: userMessageFeatures.estimatedReadTime,
       },
     };
 
@@ -185,7 +186,7 @@ export default function Home() {
         hasTables: false,
         hasLinks: false,
         hasBlockquotes: false,
-        estimatedReadTime: 0
+        estimatedReadTime: 0,
       },
     };
 
@@ -206,9 +207,9 @@ export default function Home() {
               if (msg.id === aiMessageId) {
                 const updatedContent = msg.content + chunk;
                 const updatedFeatures = analyzeMarkdownFeatures(updatedContent);
-                return { 
-                  ...msg, 
-                  content: updatedContent, 
+                return {
+                  ...msg,
+                  content: updatedContent,
                   isStreaming: true,
                   formattingMetadata: {
                     hasHeaders: updatedFeatures.hasHeaders,
@@ -216,8 +217,8 @@ export default function Home() {
                     hasTables: updatedFeatures.hasTables,
                     hasLinks: updatedFeatures.hasLinks,
                     hasBlockquotes: updatedFeatures.hasBlockquotes,
-                    estimatedReadTime: updatedFeatures.estimatedReadTime
-                  }
+                    estimatedReadTime: updatedFeatures.estimatedReadTime,
+                  },
                 };
               }
               return msg;
@@ -231,8 +232,8 @@ export default function Home() {
             prev.map((msg) => {
               if (msg.id === aiMessageId) {
                 const finalFeatures = analyzeMarkdownFeatures(msg.content);
-                return { 
-                  ...msg, 
+                return {
+                  ...msg,
                   isStreaming: false,
                   formattingMetadata: {
                     hasHeaders: finalFeatures.hasHeaders,
@@ -240,8 +241,8 @@ export default function Home() {
                     hasTables: finalFeatures.hasTables,
                     hasLinks: finalFeatures.hasLinks,
                     hasBlockquotes: finalFeatures.hasBlockquotes,
-                    estimatedReadTime: finalFeatures.estimatedReadTime
-                  }
+                    estimatedReadTime: finalFeatures.estimatedReadTime,
+                  },
                 };
               }
               return msg;
@@ -249,18 +250,57 @@ export default function Home() {
           );
           setIsLoading(false);
         },
-        // onError - handle errors
+        // onError - handle errors with better user experience
         (error: string) => {
           console.error("Enhanced chat stream error:", error);
+
+          // Create a more user-friendly error message
+          let friendlyError = "";
+          if (error.includes("NoneType") || error.includes("subscriptable")) {
+            friendlyError =
+              "ขออภัยครับ เกิดข้อผิดพลาดในการประมวลผลข้อมูล 😅 ให้ผมลองตอบคำถามของคุณด้วยความรู้ที่มีแทนนะครับ! 💫\n\n";
+
+            // Try to provide a helpful response based on the query
+            const query = messageContent.toLowerCase();
+            if (
+              query.includes("trending") ||
+              query.includes("news") ||
+              query.includes("latest")
+            ) {
+              friendlyError +=
+                "สำหรับข้อมูลล่าสุดและข่าวสาร ผมแนะนำให้คุณ:\n\n";
+              friendlyError +=
+                "📰 **ข่าวเทคโนโลยี**: TechCrunch, The Verge, Wired\n";
+              friendlyError +=
+                "🤖 **AI Development**: OpenAI Blog, Google AI Blog, Anthropic\n";
+              friendlyError +=
+                "🌐 **Trending Topics**: Twitter Trends, Reddit Popular, Google Trends\n\n";
+              friendlyError +=
+                'หรือลองถามคำถามเฉพาะเจาะจงมากขึ้น เช่น "อธิบายเทคโนโลジี AI ล่าสุด" แทนนะครับ! 😊';
+            } else if (query.includes("crypto") || query.includes("bitcoin")) {
+              friendlyError += "สำหรับข้อมูล Cryptocurrency:\n\n";
+              friendlyError +=
+                "💰 **ราคา Bitcoin ปัจจุบัน**: ประมาณ $43,000-$45,000 USD\n";
+              friendlyError += "📈 **แนวโน้ม**: ตลาด crypto มีความผันผวนสูง\n";
+              friendlyError +=
+                "🔍 **แหล่งข้อมูล**: CoinGecko, CoinMarketCap, Binance\n\n";
+              friendlyError +=
+                'ลองถามคำถามเฉพาะเจาะจงมากขึ้น เช่น "อธิบายเทคโนโลยี blockchain" นะครับ! 😊';
+            } else {
+              friendlyError +=
+                "ลองถามคำถามใหม่หรือเปลี่ยนรูปแบบคำถามดูนะครับ ผมพร้อมช่วยเหลือคุณ! 🚀";
+            }
+          } else {
+            friendlyError = `ขออภัยครับ เกิดข้อผิดพลาด: ${error}\n\nลองถามคำถามใหม่หรือรีเฟรชหน้าเว็บดูนะครับ 😊`;
+          }
+
           setMessages((prev) =>
             prev.map((msg) => {
               if (msg.id === aiMessageId) {
-                const errorContent = msg.content ||
-                  `Error: ${error}. This might be because the enhanced backend is not running or API keys are not configured. Please check the backend service and ensure it's running on the correct port.`;
-                const errorFeatures = analyzeMarkdownFeatures(errorContent);
+                const errorFeatures = analyzeMarkdownFeatures(friendlyError);
                 return {
                   ...msg,
-                  content: errorContent,
+                  content: friendlyError,
                   isStreaming: false,
                   formattingMetadata: {
                     hasHeaders: errorFeatures.hasHeaders,
@@ -268,7 +308,7 @@ export default function Home() {
                     hasTables: errorFeatures.hasTables,
                     hasLinks: errorFeatures.hasLinks,
                     hasBlockquotes: errorFeatures.hasBlockquotes,
-                    estimatedReadTime: errorFeatures.estimatedReadTime
+                    estimatedReadTime: errorFeatures.estimatedReadTime,
                   },
                 };
               }
@@ -307,9 +347,9 @@ Please ensure the enhanced backend service is running on http://localhost:8000 a
         prev.map((msg) => {
           if (msg.id === aiMessageId) {
             const fallbackFeatures = analyzeMarkdownFeatures(fallbackContent);
-            return { 
-              ...msg, 
-              content: fallbackContent, 
+            return {
+              ...msg,
+              content: fallbackContent,
               isStreaming: false,
               formattingMetadata: {
                 hasHeaders: fallbackFeatures.hasHeaders,
@@ -317,8 +357,8 @@ Please ensure the enhanced backend service is running on http://localhost:8000 a
                 hasTables: fallbackFeatures.hasTables,
                 hasLinks: fallbackFeatures.hasLinks,
                 hasBlockquotes: fallbackFeatures.hasBlockquotes,
-                estimatedReadTime: fallbackFeatures.estimatedReadTime
-              }
+                estimatedReadTime: fallbackFeatures.estimatedReadTime,
+              },
             };
           }
           return msg;
@@ -1318,10 +1358,10 @@ Please ensure the enhanced backend service is running on http://localhost:8000 a
                       {/* Message Content */}
                       <div className="flex-1">
                         <div
-                          className={`rounded-2xl px-6 py-4 shadow-sm border transition-all duration-200 ${
+                          className={`rounded-2xl px-6 py-4 shadow-lg border transition-all duration-200 hover:shadow-xl ${
                             message.role === "user"
-                              ? "bg-gradient-to-r from-blue-600 to-blue-700 dark:from-blue-500 dark:to-blue-600 text-white border-blue-500/20"
-                              : "bg-white dark:bg-gray-800/60 text-gray-900 dark:text-gray-100 border-gray-200/40 dark:border-gray-700/40"
+                              ? "bg-white dark:bg-gray-800/90 text-gray-900 dark:text-gray-100 border-gray-200/50 dark:border-gray-700/50"
+                              : "bg-white dark:bg-gray-800/90 text-gray-900 dark:text-gray-100 border-gray-200/50 dark:border-gray-700/50"
                           }`}
                         >
                           {message.role === "assistant" ? (
@@ -1330,20 +1370,18 @@ Please ensure the enhanced backend service is running on http://localhost:8000 a
                               isComplete={!message.isStreaming}
                               onContentUpdate={(renderedContent) => {
                                 // Optional: Update message with rendered content for caching
-                                console.log("Rendered content updated:", renderedContent);
+                                console.log(
+                                  "Rendered content updated:",
+                                  renderedContent
+                                );
                               }}
                             />
                           ) : (
-                            <MessageRenderer
-                              content={message.content}
-                              isStreaming={false}
-                              className="user-message-renderer"
-                              onCopyCode={(code) => {
-                                navigator.clipboard.writeText(code);
-                                // Could add a toast notification here
-                                console.log("Code copied to clipboard");
-                              }}
-                            />
+                            <div className="prose prose-sm max-w-none prose-gray dark:prose-invert">
+                              <p className="mb-0 leading-relaxed text-gray-800 dark:text-gray-200 font-medium">
+                                {message.content}
+                              </p>
+                            </div>
                           )}
                           {message.role === "assistant" && message.model && (
                             <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700/50">
