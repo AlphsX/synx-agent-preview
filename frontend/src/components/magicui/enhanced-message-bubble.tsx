@@ -44,32 +44,42 @@ export const EnhancedMessageBubble: React.FC<EnhancedMessageBubbleProps> = ({
 
   return (
     <div
-      className={`flex ${isUser ? 'justify-end' : 'justify-start'} group ${className}`}
+      className={`
+        flex ${isUser ? 'justify-end' : 'justify-start'} group 
+        ${isUser ? 'animate-message-slide-in-right' : 'animate-message-slide-in'}
+        ${className}
+      `}
     >
       <div
         className={`
           relative max-w-[85%] sm:max-w-[75%] md:max-w-[65%] lg:max-w-[60%]
           ${isUser ? 'ml-auto' : 'mr-auto'}
+          animate-message-bubble-grow
         `}
       >
-        {/* Message Container */}
+        {/* Message Container with enhanced styling */}
         <div
           className={`
             relative rounded-2xl px-4 py-3 sm:px-6 sm:py-4 
-            shadow-sm border transition-all duration-200 ease-in-out
+            shadow-sm border transition-all duration-300 ease-out-back
+            backdrop-blur-sm transform-gpu will-change-transform
+            hover:scale-[1.02] hover:-translate-y-0.5
             ${
               isUser
                 ? `
-                  bg-gradient-to-r from-blue-600 to-blue-700 
-                  dark:from-blue-500 dark:to-blue-600 
-                  text-white border-blue-500/20
-                  hover:shadow-md hover:shadow-blue-500/25
+                  bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800
+                  dark:from-blue-500 dark:via-blue-600 dark:to-blue-700 
+                  text-white border-blue-500/30
+                  hover:shadow-lg hover:shadow-blue-500/30
+                  hover:from-blue-500 hover:via-blue-600 hover:to-blue-700
+                  dark:hover:from-blue-400 dark:hover:via-blue-500 dark:hover:to-blue-600
                 `
                 : `
-                  bg-white dark:bg-gray-800/60 
+                  bg-white/80 dark:bg-gray-800/70 
                   text-gray-900 dark:text-gray-100 
-                  border-gray-200/40 dark:border-gray-700/40
-                  hover:shadow-md hover:bg-gray-50/50 dark:hover:bg-gray-800/80
+                  border-gray-200/50 dark:border-gray-700/50
+                  hover:shadow-lg hover:bg-white/90 dark:hover:bg-gray-800/85
+                  hover:border-gray-300/60 dark:hover:border-gray-600/60
                 `
             }
           `}
@@ -173,17 +183,37 @@ export const EnhancedMessageBubble: React.FC<EnhancedMessageBubbleProps> = ({
                 )}
               </div>
 
-              {/* Loading Indicator for Streaming */}
+              {/* Enhanced Loading Indicator for Streaming */}
               {isStreaming && isAssistant && (
-                <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-200/50 dark:border-gray-700/50">
-                  <div className="flex space-x-1">
-                    <div className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full animate-pulse"></div>
-                    <div className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full animate-pulse delay-75"></div>
-                    <div className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full animate-pulse delay-150"></div>
+                <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-200/50 dark:border-gray-700/50 animate-fade-in">
+                  <div className="flex items-center space-x-3">
+                    {/* Animated thinking dots */}
+                    <div className="flex space-x-1">
+                      <div className="w-2.5 h-2.5 bg-gradient-to-r from-blue-400 to-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                      <div className="w-2.5 h-2.5 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                      <div className="w-2.5 h-2.5 bg-gradient-to-r from-blue-600 to-blue-700 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                    </div>
+                    
+                    {/* Animated thinking text */}
+                    <div className="flex items-center space-x-2">
+                      <span className="text-sm font-medium text-gray-600 dark:text-gray-400 animate-pulse">
+                        Thinking
+                      </span>
+                      <div className="flex space-x-0.5">
+                        <div className="w-1 h-1 bg-gray-400 dark:bg-gray-500 rounded-full animate-pulse" style={{ animationDelay: '0ms' }}></div>
+                        <div className="w-1 h-1 bg-gray-400 dark:bg-gray-500 rounded-full animate-pulse" style={{ animationDelay: '200ms' }}></div>
+                        <div className="w-1 h-1 bg-gray-400 dark:bg-gray-500 rounded-full animate-pulse" style={{ animationDelay: '400ms' }}></div>
+                      </div>
+                    </div>
                   </div>
-                  <span className="text-xs text-gray-500 dark:text-gray-400">
-                    Thinking...
-                  </span>
+                  
+                  {/* Streaming progress indicator */}
+                  <div className="flex items-center space-x-2">
+                    <div className="w-12 h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                      <div className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full animate-wave"></div>
+                    </div>
+                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                  </div>
                 </div>
               )}
 

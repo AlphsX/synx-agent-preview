@@ -265,40 +265,102 @@ export const StreamingRenderer: React.FC<StreamingRendererProps> = ({
   const showPendingIndicator = streamingState.pendingContent && !isComplete;
   
   return (
-    <div className="streaming-renderer-container">
-      {renderedContent}
+    <div className="streaming-renderer-container relative">
+      {/* Main content with enhanced animations */}
+      <div className={`
+        transition-all duration-300 ease-out
+        ${streamingState.isProcessing ? 'animate-streaming-glow' : ''}
+      `}>
+        {renderedContent}
+      </div>
       
-      {/* Pending content indicator */}
+      {/* Enhanced pending content indicator */}
       {showPendingIndicator && (
-        <div className="pending-content-indicator mt-2 p-2 bg-gray-50 dark:bg-gray-800 rounded border-l-4 border-blue-500">
-          <div className="flex items-center space-x-2">
-            <div className="animate-spin w-3 h-3 border-2 border-blue-500 border-t-transparent rounded-full"></div>
-            <span className="text-xs text-gray-600 dark:text-gray-400">
-              Processing incomplete content...
-            </span>
+        <div className="pending-content-indicator mt-3 animate-fade-in-up">
+          <div className="flex items-center justify-between p-3 bg-gradient-to-r from-blue-50/80 to-indigo-50/80 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg border border-blue-200/50 dark:border-blue-700/50 backdrop-blur-sm">
+            <div className="flex items-center space-x-3">
+              {/* Enhanced loading animation */}
+              <div className="relative">
+                <div className="w-4 h-4 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin"></div>
+                <div className="absolute inset-0 w-4 h-4 border-2 border-transparent border-t-blue-400 rounded-full animate-spin animate-reverse" style={{ animationDelay: '0.5s' }}></div>
+              </div>
+              
+              {/* Animated text with typing effect */}
+              <div className="flex items-center space-x-1">
+                <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
+                  Processing
+                </span>
+                <div className="flex space-x-1">
+                  <div className="w-1 h-1 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                  <div className="w-1 h-1 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                  <div className="w-1 h-1 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Progress indicator */}
+            <div className="flex items-center space-x-2">
+              <div className="w-16 h-1 bg-blue-200/50 dark:bg-blue-800/50 rounded-full overflow-hidden">
+                <div className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full animate-wave"></div>
+              </div>
+              <span className="text-xs text-blue-600/70 dark:text-blue-400/70 font-mono">
+                {Math.round((streamingState.processedContent.length / (streamingState.processedContent.length + streamingState.pendingContent.length)) * 100)}%
+              </span>
+            </div>
           </div>
+          
+          {/* Development info with enhanced styling */}
           {process.env.NODE_ENV === 'development' && (
-            <div className="mt-1 text-xs font-mono text-gray-500 dark:text-gray-500 truncate">
-              Pending: {streamingState.pendingContent.substring(0, 50)}...
+            <div className="mt-2 p-2 bg-gray-100/50 dark:bg-gray-800/50 rounded border border-gray-200/50 dark:border-gray-700/50 backdrop-blur-sm">
+              <div className="text-xs font-mono text-gray-600 dark:text-gray-400 truncate">
+                <span className="font-semibold">Pending:</span> {streamingState.pendingContent.substring(0, 50)}
+                {streamingState.pendingContent.length > 50 && '...'}
+              </div>
             </div>
           )}
         </div>
       )}
       
-      {/* Error display in development */}
+      {/* Enhanced error display */}
       {process.env.NODE_ENV === 'development' && errors.length > 0 && (
-        <div className="mt-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded">
-          <div className="text-sm font-medium text-red-800 dark:text-red-200">
-            Streaming Errors ({errors.length}):
+        <div className="mt-3 animate-fade-in-up">
+          <div className="p-4 bg-gradient-to-r from-red-50/80 to-pink-50/80 dark:from-red-900/20 dark:to-pink-900/20 border border-red-200/50 dark:border-red-700/50 rounded-lg backdrop-blur-sm">
+            <div className="flex items-center space-x-2 mb-3">
+              <div className="w-5 h-5 bg-red-500 rounded-full flex items-center justify-center">
+                <span className="text-white text-xs font-bold">!</span>
+              </div>
+              <div className="text-sm font-semibold text-red-800 dark:text-red-200">
+                Streaming Errors ({errors.length})
+              </div>
+            </div>
+            
+            <div className="space-y-2 max-h-32 overflow-y-auto custom-scrollbar">
+              {errors.map((error, index) => (
+                <div key={index} className="flex items-start space-x-2 p-2 bg-white/50 dark:bg-gray-800/50 rounded border border-red-200/30 dark:border-red-700/30">
+                  <div className="w-1.5 h-1.5 bg-red-500 rounded-full mt-1.5 flex-shrink-0"></div>
+                  <div className="text-xs text-red-700 dark:text-red-300 font-mono">
+                    <span className="font-semibold">[{error.type}]</span>{' '}
+                    {'message' in error ? error.message : 'Unknown error'}
+                    {'recovery' in error && (
+                      <span className="text-red-600/70 dark:text-red-400/70">
+                        {' '}(Recovery: {error.recovery})
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
-          <ul className="mt-1 text-xs text-red-700 dark:text-red-300 list-disc list-inside max-h-20 overflow-y-auto">
-            {errors.map((error, index) => (
-              <li key={index}>
-                [{error.type}] {'message' in error ? error.message : 'Unknown error'}
-                {'recovery' in error && ` (Recovery: ${error.recovery})`}
-              </li>
-            ))}
-          </ul>
+        </div>
+      )}
+      
+      {/* Streaming completion indicator */}
+      {isComplete && streamingState.processedContent && (
+        <div className="absolute -bottom-2 right-0 animate-fade-in">
+          <div className="flex items-center space-x-1 px-2 py-1 bg-green-100/80 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-xs font-medium backdrop-blur-sm border border-green-200/50 dark:border-green-700/50">
+            <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
+            <span>Complete</span>
+          </div>
         </div>
       )}
     </div>

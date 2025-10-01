@@ -3,6 +3,64 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { MessageRenderer } from '../MessageRenderer';
 
+// Mock performance monitoring
+jest.mock('@/hooks/usePerformanceMonitoring', () => ({
+  usePerformanceMonitoring: () => ({
+    startRender: jest.fn(() => Date.now()),
+    endRender: jest.fn(() => 10),
+    recordError: jest.fn(),
+    metrics: {
+      renderTimes: [],
+      averageRenderTime: 0,
+      cacheHitRate: 0,
+      errorCount: 0,
+      peakMemoryUsage: 0,
+      totalRenders: 0,
+    },
+    enabled: true,
+  }),
+}));
+
+// Mock markdown utils
+jest.mock('@/lib/markdown-utils', () => ({
+  performanceUtils: {
+    createPerformanceMonitor: () => ({
+      startRender: () => Date.now(),
+      endRender: () => 10,
+      recordCacheHit: jest.fn(),
+      recordCacheMiss: jest.fn(),
+      recordError: jest.fn(),
+      recordMemoryUsage: jest.fn(),
+      getMetrics: () => ({
+        renderTimes: [],
+        averageRenderTime: 0,
+        cacheHitRate: 0,
+        errorCount: 0,
+        peakMemoryUsage: 0,
+      }),
+      reset: jest.fn(),
+    }),
+    measureTime: (name: string, fn: () => any) => fn(),
+    getCacheStats: () => ({
+      featureAnalysis: { size: 0, maxSize: 50 },
+      codeBlocks: { size: 0, maxSize: 30 },
+      validation: { size: 0, maxSize: 100 },
+    }),
+    clearCaches: jest.fn(),
+  },
+  validateMarkdownContent: () => [],
+  analyzeMarkdownFeatures: () => ({
+    hasCodeBlocks: false,
+    hasHeaders: false,
+    hasLists: false,
+    hasTables: false,
+    hasLinks: false,
+    hasBlockquotes: false,
+    complexity: 'simple',
+    estimatedReadTime: 1,
+  }),
+}));
+
 // Mock react-markdown and related dependencies
 jest.mock('react-markdown', () => {
   return function MockReactMarkdown({ children, components }: any) {
