@@ -21,7 +21,7 @@ const CopyButton: React.FC<CopyButtonProps> = ({ onCopy, copied, disabled = fals
       onClick={onCopy}
       disabled={disabled}
       className={`
-        absolute top-2 right-2 px-3 py-1.5 rounded-md text-xs font-medium transition-all
+        absolute top-2 right-2 flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all
         ${copied 
           ? 'bg-green-500 text-white' 
           : 'bg-gray-700 dark:bg-gray-600 text-white hover:bg-gray-600 dark:hover:bg-gray-500'
@@ -31,7 +31,21 @@ const CopyButton: React.FC<CopyButtonProps> = ({ onCopy, copied, disabled = fals
       aria-label={copied ? 'Copied to clipboard' : 'Copy code to clipboard'}
       title={copied ? 'Copied!' : 'Copy code'}
     >
-      {copied ? 'Copied!' : 'Copy'}
+      {copied ? (
+        <>
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
+          <span>Copied!</span>
+        </>
+      ) : (
+        <>
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+          </svg>
+          <span>Copy</span>
+        </>
+      )}
     </button>
   );
 };

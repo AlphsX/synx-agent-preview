@@ -74,7 +74,7 @@ export const SocialChatMessage: React.FC<SocialChatMessageProps> = memo(
                       style={{ animationDelay: "300ms" }}
                     ></div>
                   </div>
-                  <span className="text-xs">กำลังพิมพ์...</span>
+                  <span className="text-xs">Typing...</span>
                 </div>
               )}
 

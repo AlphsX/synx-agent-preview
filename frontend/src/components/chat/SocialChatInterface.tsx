@@ -82,10 +82,10 @@ export const SocialChatInterface: React.FC<SocialChatInterfaceProps> = ({
                     <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
                     <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                   </div>
-                  <span>กำลังพิมพ์...</span>
+                  <span>Typing...</span>
                 </span>
               ) : (
-                'พร้อมช่วยเหลือคุณ'
+                'Ready to help you'
               )}
             </p>
           </div>
@@ -102,10 +102,10 @@ export const SocialChatInterface: React.FC<SocialChatInterfaceProps> = ({
                 <span className="text-4xl">👋</span>
               </div>
               <h3 className="text-3xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 dark:from-white dark:via-gray-100 dark:to-white bg-clip-text text-transparent mb-4">
-                สวัสดีครับ! ยินดีต้อนรับ
+                Hello! Welcome
               </h3>
               <p className="text-gray-600 dark:text-gray-300 max-w-lg mx-auto text-lg leading-relaxed">
-                ผมพร้อมช่วยตอบคำถามและคุยกับคุณแล้ว มีอะไรให้ช่วยไหมครับ? 😊
+                I'm ready to help answer your questions and chat with you. How can I assist you today? 😊
               </p>
             </div>
           ) : (
@@ -169,7 +169,7 @@ export const SocialChatInterface: React.FC<SocialChatInterfaceProps> = ({
                 value={inputValue}
                 onChange={handleInputChange}
                 onKeyPress={handleKeyPress}
-                placeholder="พิมพ์ข้อความของคุณที่นี่..."
+                placeholder="Type your message here..."
                 disabled={isLoading}
                 className="w-full px-5 py-4 pr-12 bg-gray-50 dark:bg-gray-700/80 border border-gray-200 dark:border-gray-600 rounded-2xl resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 disabled:opacity-50 disabled:cursor-not-allowed min-h-[52px] max-h-32 shadow-sm hover:shadow-md transition-all duration-200 backdrop-blur-sm"
                 rows={1}
@@ -207,7 +207,7 @@ export const SocialChatInterface: React.FC<SocialChatInterfaceProps> = ({
                 <div className="w-1 h-1 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
                 <div className="w-1 h-1 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
               </div>
-              <span>กำลังพิมพ์...</span>
+              <span>Typing...</span>
             </div>
           )}
         </div>

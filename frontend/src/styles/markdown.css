@@ -362,7 +362,7 @@
 }
 
 .message-renderer.streaming {
-  @apply border-l-2 border-blue-500/30 pl-4;
+  /* No border or background for clean minimal look */
 }
 
 /* User message specific styling */

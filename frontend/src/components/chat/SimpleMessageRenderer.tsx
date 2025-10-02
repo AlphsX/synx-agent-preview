@@ -37,7 +37,7 @@ const SimpleCodeBlock: React.FC<{
           onClick={() => navigator.clipboard.writeText(children)}
           className="text-xs px-2 py-1 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded transition-colors"
         >
-          คัดลอก
+          Copy
         </button>
       </div>
       <pre className="p-4 overflow-x-auto">
@@ -170,7 +170,7 @@ export const SimpleMessageRenderer: React.FC<SimpleMessageRendererProps> = memo(
               style={{ animationDelay: "0.2s" }}
             ></div>
           </div>
-          <span>กำลังคิด...</span>
+          <span>Thinking...</span>
         </div>
       );
     }

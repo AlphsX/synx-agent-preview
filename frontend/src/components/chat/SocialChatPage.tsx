@@ -35,7 +35,7 @@ export const SocialChatPage: React.FC = () => {
       // Mock response - replace with actual API call
       const assistantMessage: Message = {
         id: `assistant-${Date.now()}`,
-        content: `ขอบคุณสำหรับคำถาม: "${content}"\n\nนี่คือตัวอย่างการตอบกลับที่มี **markdown formatting** และ emoji! 😊\n\n### ตัวอย่าง Code Block:\n\`\`\`javascript\nconst greeting = "สวัสดีครับ!";\nconsole.log(greeting);\n\`\`\`\n\nหวังว่าจะช่วยได้นะครับ! มีคำถามอื่นไหม? 🤔`,
+        content: `Thank you for your question: "${content}"\n\nThis is an example response with **markdown formatting** and emoji! 😊\n\n### Example Code Block:\n\`\`\`javascript\nconst greeting = "Hello!";\nconsole.log(greeting);\n\`\`\`\n\nHope this helps! Do you have any other questions? 🤔`,
         role: 'assistant',
         timestamp: new Date(),
         isStreaming: false
@@ -48,7 +48,7 @@ export const SocialChatPage: React.FC = () => {
       // Add error message
       const errorMessage: Message = {
         id: `error-${Date.now()}`,
-        content: 'ขออภัยครับ เกิดข้อผิดพลาดในการส่งข้อความ กรุณาลองใหม่อีกครั้ง 😅',
+        content: 'Sorry, there was an error sending the message. Please try again 😅',
         role: 'assistant',
         timestamp: new Date()
       };

@@ -461,7 +461,7 @@ export const MessageRenderer: React.FC<MessageRendererProps> = memo(
         th: ({ children, ...props }: any) => (
           <CustomTableHeader {...props}>{children}</CustomTableHeader>
         ),
-        td: ({ children, ...props }: unknown) => (
+        td: ({ children, ...props }: any) => (
           <CustomTableCell {...props}>{children}</CustomTableCell>
         ),
       };
@@ -485,15 +485,10 @@ export const MessageRenderer: React.FC<MessageRendererProps> = memo(
         >
           {/* Show streaming indicator if content is being streamed */}
           {isStreaming && (
-            <div className="streaming-indicator mb-2">
-              <div className="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
-                <div className="flex space-x-1">
-                  <div className="pulse-dot w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-                  <div className="pulse-dot w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-                  <div className="pulse-dot w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-                </div>
-                <span>Generating response...</span>
-              </div>
+            <div className="flex items-center gap-1 text-gray-400 dark:text-gray-500 mb-2">
+              <span className="inline-block w-1.5 h-1.5 bg-current rounded-full animate-pulse" style={{ animationDelay: '0ms' }}></span>
+              <span className="inline-block w-1.5 h-1.5 bg-current rounded-full animate-pulse" style={{ animationDelay: '150ms' }}></span>
+              <span className="inline-block w-1.5 h-1.5 bg-current rounded-full animate-pulse" style={{ animationDelay: '300ms' }}></span>
             </div>
           )}
 

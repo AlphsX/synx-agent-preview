@@ -258,7 +258,7 @@ export default function Home() {
           let friendlyError = "";
           if (error.includes("NoneType") || error.includes("subscriptable")) {
             friendlyError =
-              "ขออภัยครับ เกิดข้อผิดพลาดในการประมวลผลข้อมูล 😅 ให้ผมลองตอบคำถามของคุณด้วยความรู้ที่มีแทนนะครับ! 💫\n\n";
+              "Sorry, there was an error processing the data 😅 Let me try to answer your question with my available knowledge instead! 💫\n\n";
 
             // Try to provide a helpful response based on the query
             const query = messageContent.toLowerCase();
@@ -268,30 +268,31 @@ export default function Home() {
               query.includes("latest")
             ) {
               friendlyError +=
-                "สำหรับข้อมูลล่าสุดและข่าวสาร ผมแนะนำให้คุณ:\n\n";
+                "For the latest information and news, I recommend:\n\n";
               friendlyError +=
-                "📰 **ข่าวเทคโนโลยี**: TechCrunch, The Verge, Wired\n";
+                "📰 **Tech News**: TechCrunch, The Verge, Wired\n";
               friendlyError +=
                 "🤖 **AI Development**: OpenAI Blog, Google AI Blog, Anthropic\n";
               friendlyError +=
                 "🌐 **Trending Topics**: Twitter Trends, Reddit Popular, Google Trends\n\n";
               friendlyError +=
-                'หรือลองถามคำถามเฉพาะเจาะจงมากขึ้น เช่น "อธิบายเทคโนโลジี AI ล่าสุด" แทนนะครับ! 😊';
+                'Or try asking more specific questions like "Explain the latest AI technology" instead! 😊';
             } else if (query.includes("crypto") || query.includes("bitcoin")) {
-              friendlyError += "สำหรับข้อมูล Cryptocurrency:\n\n";
+              friendlyError += "For Cryptocurrency information:\n\n";
               friendlyError +=
-                "💰 **ราคา Bitcoin ปัจจุบัน**: ประมาณ $43,000-$45,000 USD\n";
-              friendlyError += "📈 **แนวโน้ม**: ตลาด crypto มีความผันผวนสูง\n";
+                "💰 **Current Bitcoin Price**: Around $43,000-$45,000 USD\n";
               friendlyError +=
-                "🔍 **แหล่งข้อมูล**: CoinGecko, CoinMarketCap, Binance\n\n";
+                "📈 **Trend**: Crypto market is highly volatile\n";
               friendlyError +=
-                'ลองถามคำถามเฉพาะเจาะจงมากขึ้น เช่น "อธิบายเทคโนโลยี blockchain" นะครับ! 😊';
+                "🔍 **Data Sources**: CoinGecko, CoinMarketCap, Binance\n\n";
+              friendlyError +=
+                'Try asking more specific questions like "Explain blockchain technology"! 😊';
             } else {
               friendlyError +=
-                "ลองถามคำถามใหม่หรือเปลี่ยนรูปแบบคำถามดูนะครับ ผมพร้อมช่วยเหลือคุณ! 🚀";
+                "Try asking a new question or changing the format of your question. I'm ready to help you! 🚀";
             }
           } else {
-            friendlyError = `ขออภัยครับ เกิดข้อผิดพลาด: ${error}\n\nลองถามคำถามใหม่หรือรีเฟรชหน้าเว็บดูนะครับ 😊`;
+            friendlyError = `Sorry, an error occurred: ${error}\n\nTry asking a new question or refresh the page 😊`;
           }
 
           setMessages((prev) =>
