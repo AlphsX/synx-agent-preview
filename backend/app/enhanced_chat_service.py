@@ -16,6 +16,7 @@ from app.ai.enhanced_service import EnhancedAIService
 from app.vector.service import vector_service
 from app.conversation_service import conversation_service
 from app.auth.schemas import UserResponse
+from app.enhanced_error_handler import error_handler, safe_async_generator, SafeDataHandler
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +27,7 @@ class EnhancedChatService:
         self.binance_service = BinanceService()
         self.vector_service = vector_service
         self.unified_service = unified_service
+        self.safe_data = SafeDataHandler()
         
         # Redis for conversation history caching
         self.redis_client = None
@@ -68,6 +70,7 @@ class EnhancedChatService:
             logger.warning(f"Redis connection failed: {e}. Conversation caching disabled.")
             self.redis_client = None
         
+    @safe_async_generator("Oops! Something went wrong on my end: 'NoneType' object is not subscriptable 😅 Let me try to help you anyway! 💫")
     async def generate_ai_response(self, 
                                  message: str,
                                  model_id: str,
@@ -106,7 +109,8 @@ class EnhancedChatService:
             
             # Prepare messages for AI service
             messages = [{"role": "system", "content": system_message}]
-            messages.extend(conversation_history[-10:])  # Last 10 messages for context
+            if conversation_history and isinstance(conversation_history, list):
+                messages.extend(conversation_history[-10:])  # Last 10 messages for context
             messages.append({"role": "user", "content": message})
             
             # Store user message in database with user context
@@ -134,8 +138,8 @@ class EnhancedChatService:
                 had_errors = True
                 error_details = {"ai_service_error": str(ai_error), "used_fallback": True}
                 logger.error(f"AI service error: {ai_error}")
-                # Fallback to mock response
-                async for chunk in self._generate_enhanced_mock_response(message, enhanced_context):
+                # Fallback to safe mock response
+                async for chunk in error_handler.safe_generate_mock_response(message, enhanced_context):
                     response_content += chunk
                     yield chunk
             
@@ -169,8 +173,8 @@ class EnhancedChatService:
             had_errors = True
             error_details = {"general_error": str(e)}
             logger.error(f"Error in generate_ai_response: {e}")
-            # Fallback to enhanced mock response
-            async for chunk in self._generate_enhanced_mock_response(message, {}):
+            # Fallback to safe mock response
+            async for chunk in error_handler.safe_generate_mock_response(message, {}):
                 yield chunk
     
     async def _get_enhanced_context(self, message: str, user_context: Dict[str, Any] = None) -> Dict[str, Any]:
@@ -260,17 +264,28 @@ class EnhancedChatService:
             # Use unified search service with SerpAPI priority
             search_results = await self.search_service.search_web(message, count=5)
             
-            if search_results:
+            # Safely check if we have valid results
+            if search_results and isinstance(search_results, list) and len(search_results) > 0:
+                # Safely get provider from first result
+                provider = "unknown"
+                if search_results[0] and isinstance(search_results[0], dict):
+                    provider = search_results[0].get("provider", "unknown")
+                
                 return {
                     "web_search": {
                         "query": message,
                         "results": search_results,
-                        "provider": search_results[0].get("provider", "unknown") if search_results else "none"
+                        "provider": provider
                     }
                 }
+            else:
+                # No results found - return empty but valid structure
+                logger.info(f"No web search results found for: {message}")
+                return {}
+                
         except Exception as e:
             logger.error(f"Web search context error: {e}")
-            return {"web_search": {"error": str(e), "query": message}}
+            return {}
         
         return {}
     
@@ -308,17 +323,28 @@ class EnhancedChatService:
             # Use unified search service for news
             news_results = await self.search_service.search_news(message, count=5)
             
-            if news_results:
+            # Safely check if we have valid results
+            if news_results and isinstance(news_results, list) and len(news_results) > 0:
+                # Safely get provider from first result
+                provider = "unknown"
+                if news_results[0] and isinstance(news_results[0], dict):
+                    provider = news_results[0].get("provider", "unknown")
+                
                 return {
                     "news": {
                         "query": message,
                         "results": news_results,
-                        "provider": news_results[0].get("provider", "unknown") if news_results else "none"
+                        "provider": provider
                     }
                 }
+            else:
+                # No results found - return empty but valid structure
+                logger.info(f"No news results found for: {message}")
+                return {}
+                
         except Exception as e:
             logger.error(f"News context error: {e}")
-            return {"news": {"error": str(e), "query": message}}
+            return {}
         
         return {}
     
@@ -328,7 +354,7 @@ class EnhancedChatService:
             # Search vector database for relevant documents
             vector_results = await self.vector_service.search(message, top_k=3)
             
-            if vector_results:
+            if vector_results and isinstance(vector_results, list) and len(vector_results) > 0:
                 return {
                     "vector_search": {
                         "query": message,
@@ -346,110 +372,246 @@ class EnhancedChatService:
         # Build user-aware base message
         if user_context and user_context.get("is_authenticated"):
             username = user_context.get("username", "User")
-            base_message = f"""You are Checkmate Spec Preview, an AI assistant inspired by Sync. You're witty, 
-            informative, and have access to real-time information through multiple data sources. You can search 
-            the web, get cryptocurrency data, access news, and retrieve domain-specific knowledge. 
+            base_message = f"""You are Checkmate Spec Preview, an AI assistant inspired by Sync. You're witty, informative, and helpful.
 
-            You are currently assisting {username}, who is authenticated. You can provide personalized responses 
-            and maintain conversation context. Use the provided context to give accurate, current, and helpful responses."""
+You are currently assisting {username}, who is authenticated.
+
+IMPORTANT RULES:
+1. I have already fetched all necessary real-time data for you
+2. DO NOT try to call any functions, tools, or search APIs
+3. Simply use the context information provided below to answer directly
+4. If context data is provided, use it to give accurate, current responses
+5. If no context data is provided, use your general knowledge
+
+RESPONSE FORMATTING RULES (CRITICAL):
+• Use clear markdown formatting for better readability
+• Start with a brief, direct answer to the question
+• Use **bold** for important terms, names, and key points
+• Use bullet points (•) or numbered lists for multiple items
+• Add emojis sparingly for visual breaks (🔥 📰 💡 ✨ 🎯 etc.)
+• Separate sections with blank lines for breathing room
+• For news/search results: Use this format:
+  
+  **[Number]. [Title]**
+  [Description]
+  📰 [Source] • [Time/Date]
+  
+• For lists: Use clear hierarchy with proper indentation
+• For explanations: Break into digestible paragraphs (2-3 sentences each)
+• End with an engaging question or call-to-action when appropriate
+
+EXAMPLE GOOD FORMAT:
+Here's what I found:
+
+**1. Main Topic Title**
+Brief description of the topic that's easy to scan.
+📰 Source Name • 2 hours ago
+
+**2. Second Topic**
+Another clear description.
+📰 Another Source • 4 hours ago
+
+Would you like more details on any of these?
+
+AVOID:
+• Long walls of text without breaks
+• Missing bold/emphasis on key terms
+• No structure or hierarchy
+• Unclear separation between items"""
         else:
-            base_message = """You are Checkmate Spec Preview, an AI assistant inspired by Sync. You're witty, 
-            informative, and have access to real-time information through multiple data sources. You can search 
-            the web, get cryptocurrency data, access news, and retrieve domain-specific knowledge. 
+            base_message = """You are Checkmate Spec Preview, an AI assistant inspired by Sync. You're witty, informative, and helpful.
 
-            You are currently in anonymous mode. Use the provided context to give accurate, current, and helpful responses."""
+You are currently in anonymous mode.
+
+IMPORTANT RULES:
+1. I have already fetched all necessary real-time data for you
+2. DO NOT try to call any functions, tools, or search APIs
+3. Simply use the context information provided below to answer directly
+4. If context data is provided, use it to give accurate, current responses
+5. If no context data is provided, use your general knowledge
+
+RESPONSE FORMATTING RULES (CRITICAL):
+• Use clear markdown formatting for better readability
+• Start with a brief, direct answer to the question
+• Use **bold** for important terms, names, and key points
+• Use bullet points (•) or numbered lists for multiple items
+• Add emojis sparingly for visual breaks (🔥 📰 💡 ✨ 🎯 etc.)
+• Separate sections with blank lines for breathing room
+• For news/search results: Use this format:
+  
+  **[Number]. [Title]**
+  [Description]
+  📰 [Source] • [Time/Date]
+  
+• For lists: Use clear hierarchy with proper indentation
+• For explanations: Break into digestible paragraphs (2-3 sentences each)
+• End with an engaging question or call-to-action when appropriate
+
+EXAMPLE GOOD FORMAT:
+Here's what I found:
+
+**1. Main Topic Title**
+Brief description of the topic that's easy to scan.
+📰 Source Name • 2 hours ago
+
+**2. Second Topic**
+Another clear description.
+📰 Another Source • 4 hours ago
+
+Would you like more details on any of these?
+
+AVOID:
+• Long walls of text without breaks
+• Missing bold/emphasis on key terms
+• No structure or hierarchy
+• Unclear separation between items"""
         
         context_sections = []
         
         # Web search context
-        if context.get("web_search") and "results" in context["web_search"]:
-            search_data = context["web_search"]
-            provider = search_data.get("provider", "search engine")
-            context_sections.append(f"\n=== WEB SEARCH RESULTS (via {provider}) ===")
-            
-            for i, result in enumerate(search_data["results"][:5], 1):
-                title = result.get("title", "No title")
-                description = result.get("description", "No description")
-                url = result.get("url", "")
-                source = result.get("source", "")
+        web_search = self.safe_data.safe_dict(context.get("web_search", {}))
+        if web_search and "results" in web_search:
+            results = self.safe_data.safe_list(web_search.get("results", []))
+            if results and len(results) > 0:
+                provider = self.safe_data.safe_string(web_search.get("provider", "search engine"))
+                context_sections.append(f"\n=== WEB SEARCH RESULTS (via {provider}) ===")
                 
-                context_sections.append(f"{i}. {title}")
-                if description:
-                    context_sections.append(f"   {description}")
-                if source:
-                    context_sections.append(f"   Source: {source}")
-                context_sections.append("")
+                for i, result in enumerate(results[:5], 1):
+                    result = self.safe_data.safe_dict(result)
+                    if result:
+                        title = self.safe_data.safe_string(result.get("title", "No title"))
+                        description = self.safe_data.safe_string(result.get("description", "No description"))
+                        url = self.safe_data.safe_string(result.get("url", ""))
+                        source = self.safe_data.safe_string(result.get("source", ""))
+                        
+                        context_sections.append(f"{i}. {title}")
+                        if description:
+                            context_sections.append(f"   {description}")
+                        if source:
+                            context_sections.append(f"   Source: {source}")
+                        context_sections.append("")
         
         # Cryptocurrency context
         if context.get("crypto_data"):
             crypto_data = context["crypto_data"]
-            if "market" in crypto_data and not crypto_data.get("error"):
+            if "market" in crypto_data and not crypto_data.get("error") and crypto_data["market"]:
                 context_sections.append("\n=== CRYPTOCURRENCY MARKET DATA ===")
                 
-                for symbol, data in crypto_data["market"].items():
-                    if isinstance(data, dict):
-                        price = data.get("price", "N/A")
-                        change = data.get("change", "N/A")
-                        volume = data.get("volume", "N/A")
-                        context_sections.append(f"{symbol}: ${price} (24h: {change}%) Volume: {volume}")
+                market_data = crypto_data["market"]
+                if isinstance(market_data, dict):
+                    for symbol, data in market_data.items():
+                        if isinstance(data, dict):
+                            price = data.get("price", "N/A")
+                            change = data.get("change", "N/A")
+                            volume = data.get("volume", "N/A")
+                            context_sections.append(f"{symbol}: ${price} (24h: {change}%) Volume: {volume}")
                 
-                if "trending" in crypto_data and "gainers" in crypto_data["trending"]:
-                    context_sections.append("\nTop Gainers:")
-                    for gainer in crypto_data["trending"]["gainers"][:5]:
-                        symbol = gainer.get("symbol", "")
-                        change = gainer.get("change", 0)
-                        context_sections.append(f"  {symbol}: +{change:.2f}%")
-                
-                if "trending" in crypto_data and "losers" in crypto_data["trending"]:
-                    context_sections.append("\nTop Losers:")
-                    for loser in crypto_data["trending"]["losers"][:3]:
-                        symbol = loser.get("symbol", "")
-                        change = loser.get("change", 0)
-                        context_sections.append(f"  {symbol}: {change:.2f}%")
+                trending_data = crypto_data.get("trending", {})
+                if isinstance(trending_data, dict):
+                    gainers = trending_data.get("gainers", [])
+                    if gainers and isinstance(gainers, list):
+                        context_sections.append("\nTop Gainers:")
+                        for gainer in gainers[:5]:
+                            if isinstance(gainer, dict):
+                                symbol = gainer.get("symbol", "")
+                                change = gainer.get("change", 0)
+                                context_sections.append(f"  {symbol}: +{change:.2f}%")
+                    
+                    losers = trending_data.get("losers", [])
+                    if losers and isinstance(losers, list):
+                        context_sections.append("\nTop Losers:")
+                        for loser in losers[:3]:
+                            if isinstance(loser, dict):
+                                symbol = loser.get("symbol", "")
+                                change = loser.get("change", 0)
+                                context_sections.append(f"  {symbol}: {change:.2f}%")
         
         # News context
-        if context.get("news") and "results" in context["news"]:
-            news_data = context["news"]
-            provider = news_data.get("provider", "news service")
-            context_sections.append(f"\n=== LATEST NEWS (via {provider}) ===")
-            
-            for i, article in enumerate(news_data["results"][:5], 1):
-                title = article.get("title", "No title")
-                description = article.get("description", "")
-                published = article.get("published", "")
-                source = article.get("source", "")
+        news_data = self.safe_data.safe_dict(context.get("news", {}))
+        if news_data and "results" in news_data:
+            results = self.safe_data.safe_list(news_data.get("results", []))
+            if results and len(results) > 0:
+                provider = self.safe_data.safe_string(news_data.get("provider", "news service"))
+                context_sections.append(f"\n=== LATEST NEWS (via {provider}) ===")
                 
-                context_sections.append(f"{i}. {title}")
-                if description:
-                    context_sections.append(f"   {description}")
-                if published:
-                    context_sections.append(f"   Published: {published}")
-                if source:
-                    context_sections.append(f"   Source: {source}")
-                context_sections.append("")
+                for i, article in enumerate(results[:5], 1):
+                    article = self.safe_data.safe_dict(article)
+                    if article:
+                        title = self.safe_data.safe_string(article.get("title", "No title"))
+                        description = self.safe_data.safe_string(article.get("description", ""))
+                        published = self.safe_data.safe_string(article.get("published", ""))
+                        source = self.safe_data.safe_string(article.get("source", ""))
+                        
+                        context_sections.append(f"{i}. {title}")
+                        if description:
+                            context_sections.append(f"   {description}")
+                        if published:
+                            context_sections.append(f"   Published: {published}")
+                        if source:
+                            context_sections.append(f"   Source: {source}")
+                        context_sections.append("")
         
         # Vector search context
         if context.get("vector_search") and "results" in context["vector_search"]:
             vector_data = context["vector_search"]
-            context_sections.append("\n=== DOMAIN KNOWLEDGE ===")
-            
-            for i, result in enumerate(vector_data["results"][:3], 1):
-                content = result.get("content", "")
-                similarity = result.get("similarity_score", 0)
-                metadata = result.get("metadata", {})
+            results = vector_data.get("results", [])
+            if results and isinstance(results, list):
+                context_sections.append("\n=== DOMAIN KNOWLEDGE ===")
                 
-                context_sections.append(f"{i}. Relevance: {similarity:.2f}")
-                context_sections.append(f"   {content[:200]}...")
-                if metadata:
-                    context_sections.append(f"   Metadata: {metadata}")
-                context_sections.append("")
+                for i, result in enumerate(results[:3], 1):
+                    if result and isinstance(result, dict):
+                        content = result.get("content", "")
+                        similarity = result.get("similarity_score", 0)
+                        metadata = result.get("metadata", {})
+                        
+                        context_sections.append(f"{i}. Relevance: {similarity:.2f}")
+                        context_sections.append(f"   {content[:200]}...")
+                        if metadata:
+                            context_sections.append(f"   Metadata: {metadata}")
+                        context_sections.append("")
         
         # Combine all sections
         if context_sections:
-            base_message += "\n" + "\n".join(context_sections)
-            base_message += "\n=== END CONTEXT ===\n"
-            base_message += "\nUse this context information to provide accurate and helpful responses. "
-            base_message += "Cite sources when appropriate and indicate when information is current."
+            base_message += "\n\n" + "\n".join(context_sections)
+            base_message += "\n=== END OF CONTEXT DATA ===\n\n"
+            base_message += "HOW TO USE THIS DATA:\n"
+            base_message += "1. Use ONLY the context data provided above\n"
+            base_message += "2. DO NOT try to search for more information or call functions/tools\n"
+            base_message += "3. Format your response using the formatting rules above\n"
+            base_message += "4. Start with a brief intro, then present the information clearly\n"
+            base_message += "5. Use **bold** for titles, • for lists, 📰 for sources\n"
+            base_message += "6. Add blank lines between items for readability\n"
+            base_message += "7. End with an engaging question or offer to help more\n\n"
+            base_message += "RESPONSE STRUCTURE:\n"
+            base_message += "[Brief intro sentence]\n\n"
+            base_message += "**1. [First Item Title]**\n"
+            base_message += "[Description]\n"
+            base_message += "📰 [Source] • [Time]\n\n"
+            base_message += "**2. [Second Item Title]**\n"
+            base_message += "[Description]\n"
+            base_message += "📰 [Source] • [Time]\n\n"
+            base_message += "[Closing question or offer]\n"
+        else:
+            # No external context available - inform AI to use general knowledge
+            base_message += "\n\n=== NO REAL-TIME DATA AVAILABLE ===\n\n"
+            base_message += "HOW TO RESPOND:\n"
+            base_message += "1. No real-time external data is currently available\n"
+            base_message += "2. DO NOT try to search for information or call functions/tools\n"
+            base_message += "3. Use the formatting rules above for your response\n"
+            base_message += "4. If user asks for current information (news, trends, prices):\n"
+            base_message += "   • Start with: 'I don't have access to real-time data right now, but...'\n"
+            base_message += "   • Offer general knowledge about the topic\n"
+            base_message += "   • Suggest where to find current info (use bullet points)\n"
+            base_message += "   • Keep it friendly and helpful\n\n"
+            base_message += "RESPONSE STRUCTURE:\n"
+            base_message += "[Polite explanation about no real-time data]\n\n"
+            base_message += "**General Information:**\n"
+            base_message += "[What you know about the topic]\n\n"
+            base_message += "**Where to find current information:**\n"
+            base_message += "• [Source 1] - [What it offers]\n"
+            base_message += "• [Source 2] - [What it offers]\n"
+            base_message += "• [Source 3] - [What it offers]\n\n"
+            base_message += "[Engaging question to continue conversation]\n"
         
         return base_message
     
@@ -549,27 +711,7 @@ class EnhancedChatService:
     
     def _extract_providers_from_context(self, context: Dict[str, Any]) -> List[str]:
         """Extract provider information from context data"""
-        providers = []
-        
-        # Safely extract web search provider
-        web_search = context.get("web_search") or {}
-        if web_search.get("provider"):
-            providers.append(web_search["provider"])
-        
-        # Safely extract news provider
-        news = context.get("news") or {}
-        if news.get("provider"):
-            providers.append(news["provider"])
-        
-        # Check for crypto data
-        if context.get("crypto_data"):
-            providers.append("Binance")
-        
-        # Check for vector search
-        if context.get("vector_search"):
-            providers.append("Vector Database")
-        
-        return providers
+        return error_handler.safe_extract_providers(context)
     
     async def _cache_conversation_message(self, conversation_id: str, user_message: str, 
                                         ai_response: str, model_id: str, context: Dict[str, Any], user_context: Dict[str, Any] = None):
