@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   Sparkles,
   Globe,
@@ -688,9 +688,9 @@ Please ensure the enhanced backend service is running on http://localhost:8000 a
         speechRecognitionRef.current = null;
       }
     };
-  }, [isDarkMode, toggleDarkMode]);
+  }, [isDarkMode, isDesktopSidebarCollapsed, isSidebarOpen, toggleDarkMode]);
 
-  const toggleVoiceRecognition = () => {
+  const toggleVoiceRecognition = useCallback(() => {
     // Check if browser supports SpeechRecognition
     const SpeechRecognition =
       window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -787,7 +787,7 @@ Please ensure the enhanced backend service is running on http://localhost:8000 a
         }
       }
     }
-  };
+  });
 
   // Keyboard shortcut to focus input field (⌘+J on Mac, Ctrl+J on Windows/Linux)
   // and to trigger voice recognition (Cmd+Enter on Mac, Ctrl+Enter on Windows/Linux)
@@ -817,166 +817,158 @@ Please ensure the enhanced backend service is running on http://localhost:8000 a
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isListening]);
+  }, [isListening, toggleVoiceRecognition]);
 
   return (
     <div className="flex h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-1000 dark:via-gray-950 dark:to-gray-900 text-gray-900 dark:text-gray-50 transition-all duration-500">
       {/* Mobile Sidebar Overlay */}
-      {isSidebarOpen && (
-        <div className="md:hidden fixed inset-0 z-50 flex">
-          <div
-            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-            onClick={(e) => {
-              // Only close sidebar if clicking directly on the overlay, not on child elements
-              if (e.target === e.currentTarget) {
-                setIsSidebarOpen(false);
-              }
-            }}
-          ></div>
-          <div className="relative w-64 bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl border-r border-gray-200/30 dark:border-gray-700/30 flex-col animate-slide-in z-10">
-            {/* Mobile Sidebar Header */}
-            <div className="p-6 border-b border-gray-200/60 dark:border-gray-800/60">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="relative">
-                    <div
-                      className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-r from-blue-600 to-blue-700 dark:from-blue-500 dark:to-blue-600 shadow-md cursor-pointer hover:scale-105 transition-transform duration-200"
-                      onClick={(e) => {
-                        e.stopPropagation(); // Prevent sidebar toggle when clicking logo
-                        setMessages([]);
-                        setShowWelcome(true);
-                        setSelectedTool(null); // Reset selected tool
-                        setInputText(""); // Clear input field
-                      }}
-                      data-sidebar-element="logo"
-                    >
-                      <Zap className="h-5 w-5 text-white mx-auto" />
-                    </div>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setIsSidebarOpen(false)}
-                  className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors flex items-center justify-center"
-                  data-sidebar-element="mobile-close"
+      <div
+        className={`md:hidden fixed inset-0 z-50 flex transition-opacity duration-300 ${
+          isSidebarOpen
+            ? "opacity-100 pointer-events-auto"
+            : "opacity-0 pointer-events-none"
+        }`}
+      >
+        <div
+          className="absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity duration-300"
+          onClick={(e) => {
+            // Only close sidebar if clicking directly on the overlay, not on child elements
+            if (e.target === e.currentTarget) {
+              setIsSidebarOpen(false);
+            }
+          }}
+        ></div>
+        <div
+          className={`relative w-64 bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl border-r border-gray-200/30 dark:border-gray-700/30 flex flex-col z-10 transition-transform duration-300 ease-out ${
+            isSidebarOpen ? "translate-x-0" : "-translate-x-full"
+          }`}
+        >
+          {/* Mobile Sidebar Header */}
+          <div className="p-6 border-b border-gray-200/60 dark:border-gray-800/60">
+            <div className="flex items-center justify-start">
+              <div className="relative">
+                <div
+                  className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-r from-blue-600 to-blue-700 dark:from-blue-500 dark:to-blue-600 shadow-md cursor-pointer hover:scale-105 transition-transform duration-200"
+                  onClick={(e) => {
+                    e.stopPropagation(); // Prevent sidebar toggle when clicking logo
+                    setMessages([]);
+                    setShowWelcome(true);
+                    setSelectedTool(null); // Reset selected tool
+                    setInputText(""); // Clear input field
+                  }}
+                  data-sidebar-element="logo"
                 >
-                  <Plus className="h-4 w-4 rotate-45 mx-auto" />
-                </button>
-              </div>
-            </div>
-
-            {/* Mobile New Chat Button */}
-            <div className="p-4 pt-2 pb-2">
-              <button
-                className="w-full flex items-center space-x-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 dark:from-blue-600 dark:to-blue-700 dark:hover:from-blue-600 dark:hover:to-blue-800 text-white rounded-xl py-2 px-3 text-sm font-medium transition-all duration-200 shadow hover:shadow-md transform hover:scale-105"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setMessages([]);
-                  setShowWelcome(true);
-                  setSelectedTool(null); // Reset selected tool
-                  setInputText(""); // Clear input field
-                }}
-              >
-                <Plus className="h-5 w-5 flex-shrink-0" />
-                <span>New Chat</span>
-              </button>
-            </div>
-
-            {/* Mobile Chat History */}
-            <div className="flex-1 overflow-y-auto px-4 pt-2 pb-4">
-              <div className="space-y-2">
-                <button
-                  className="w-full h-10 flex items-center space-x-2 bg-white/80 dark:bg-gray-800/40 hover:bg-gray-100 dark:hover:bg-gray-700/40 text-gray-800 dark:text-gray-200 rounded-xl py-2 px-3 text-sm font-medium transition-all duration-200 shadow-sm hover:shadow border border-gray-200/40 dark:border-gray-700/40"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <Globe className="h-4 w-4 text-blue-500 flex-shrink-0" />
-                  <div className="text-left">
-                    <p className="text-sm font-medium truncate">
-                      Web search capabilities
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      2 hours ago
-                    </p>
-                  </div>
-                </button>
-                <button
-                  className="w-full h-10 flex items-center space-x-2 bg-white/80 dark:bg-gray-800/40 hover:bg-gray-100 dark:hover:bg-gray-700/40 text-gray-800 dark:text-gray-200 rounded-xl py-2 px-3 text-sm font-medium transition-all duration-200 shadow-sm hover:shadow border border-gray-200/40 dark:border-gray-700/40"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <TrendingUp className="h-4 w-4 text-green-500 flex-shrink-0" />
-                  <div className="text-left">
-                    <p className="text-sm font-medium truncate">
-                      Crypto market analysis
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      Yesterday
-                    </p>
-                  </div>
-                </button>
-                <button
-                  className="w-full h-10 flex items-center space-x-2 bg-white/80 dark:bg-gray-800/40 hover:bg-gray-100 dark:hover:bg-gray-700/40 text-gray-800 dark:text-gray-200 rounded-xl py-2 px-3 text-sm font-medium transition-all duration-200 shadow-sm hover:shadow border border-gray-200/40 dark:border-gray-700/40"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <Sparkles className="h-4 w-4 text-purple-500 flex-shrink-0" />
-                  <div className="text-left">
-                    <p className="text-sm font-medium truncate">
-                      General AI conversation
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      2 days ago
-                    </p>
-                  </div>
-                </button>
-              </div>
-            </div>
-
-            {/* Mobile Sidebar Footer */}
-            <div className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <div className="relative">
-                    <div className="h-8 w-8 bg-gradient-to-r from-blue-500 to-blue-600 dark:from-blue-600 dark:to-blue-700 rounded-full flex items-center justify-center">
-                      <User className="h-5 w-5 text-white mx-auto" />
-                    </div>
-                    <div className="absolute bottom-0 right-0 h-2.5 w-2.5 bg-green-500 dark:bg-green-400 rounded-full border-2 border-white dark:border-gray-900"></div>
-                  </div>
-                  <span className="text-sm font-medium">𝕏</span>
-                </div>
-                <div className="flex items-center space-x-1">
-                  {/* Development test button - remove in production */}
-                  <button
-                    className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors flex items-center justify-center text-xs"
-                    onClick={async (e) => {
-                      e.stopPropagation();
-                      console.log("Testing enhanced backend...");
-                      await testEnhancedBackend();
-                      await testStreamingChat();
-                    }}
-                    title="Test Enhanced Backend"
-                  >
-                    🧪
-                  </button>
-                  <AnimatedThemeToggler
-                    isDarkMode={isDarkMode}
-                    toggleDarkMode={toggleDarkMode}
-                    className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors flex items-center justify-center"
-                  />
-                  <button
-                    className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors flex items-center justify-center"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setIsSidebarOpen(false);
-                    }}
-                    title="Close sidebar"
-                    data-sidebar-element="mobile-sidebar-toggle"
-                  >
-                    <ChevronLeft className="h-4 w-4 text-gray-600 dark:text-gray-400 mx-auto" />
-                  </button>
+                  <Zap className="h-5 w-5 text-white mx-auto" />
                 </div>
               </div>
             </div>
           </div>
+
+          {/* Mobile New Chat Button */}
+          <div className="p-4 pt-2 pb-2">
+            <button
+              className="w-full flex items-center space-x-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 dark:from-blue-600 dark:to-blue-700 dark:hover:from-blue-600 dark:hover:to-blue-800 text-white rounded-xl py-2 px-3 text-sm font-medium transition-all duration-200 shadow hover:shadow-md transform hover:scale-105"
+              onClick={(e) => {
+                e.stopPropagation();
+                setMessages([]);
+                setShowWelcome(true);
+                setSelectedTool(null); // Reset selected tool
+                setInputText(""); // Clear input field
+              }}
+            >
+              <Plus className="h-5 w-5 flex-shrink-0" />
+              <span>New Chat</span>
+            </button>
+          </div>
+
+          {/* Mobile Chat History */}
+          <div className="flex-1 overflow-y-auto px-4 pt-2 pb-4">
+            <div className="space-y-2">
+              <button
+                className="w-full h-10 flex items-center space-x-2 bg-white/80 dark:bg-gray-800/40 hover:bg-gray-100 dark:hover:bg-gray-700/40 text-gray-800 dark:text-gray-200 rounded-xl py-2 px-3 text-sm font-medium transition-all duration-200 shadow-sm hover:shadow border border-gray-200/40 dark:border-gray-700/40"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <Globe className="h-4 w-4 text-blue-500 flex-shrink-0" />
+                <div className="text-left">
+                  <p className="text-sm font-medium truncate">
+                    Web search capabilities
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    2 hours ago
+                  </p>
+                </div>
+              </button>
+              <button
+                className="w-full h-10 flex items-center space-x-2 bg-white/80 dark:bg-gray-800/40 hover:bg-gray-100 dark:hover:bg-gray-700/40 text-gray-800 dark:text-gray-200 rounded-xl py-2 px-3 text-sm font-medium transition-all duration-200 shadow-sm hover:shadow border border-gray-200/40 dark:border-gray-700/40"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <TrendingUp className="h-4 w-4 text-green-500 flex-shrink-0" />
+                <div className="text-left">
+                  <p className="text-sm font-medium truncate">
+                    Crypto market analysis
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Yesterday
+                  </p>
+                </div>
+              </button>
+              <button
+                className="w-full h-10 flex items-center space-x-2 bg-white/80 dark:bg-gray-800/40 hover:bg-gray-100 dark:hover:bg-gray-700/40 text-gray-800 dark:text-gray-200 rounded-xl py-2 px-3 text-sm font-medium transition-all duration-200 shadow-sm hover:shadow border border-gray-200/40 dark:border-gray-700/40"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <Sparkles className="h-4 w-4 text-purple-500 flex-shrink-0" />
+                <div className="text-left">
+                  <p className="text-sm font-medium truncate">
+                    General AI conversation
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    2 days ago
+                  </p>
+                </div>
+              </button>
+            </div>
+          </div>
+
+          {/* Mobile Sidebar Footer */}
+          <div className="p-4 border-t border-gray-200/60 dark:border-gray-800/60 mt-auto">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="relative">
+                  <div className="h-9 w-9 bg-gradient-to-r from-blue-500 to-blue-600 dark:from-blue-600 dark:to-blue-700 rounded-full flex items-center justify-center">
+                    <User className="h-6 w-6 text-white mx-auto" />
+                  </div>
+                  <div className="absolute bottom-0 right-0 h-3 w-3 bg-green-500 dark:bg-green-400 rounded-full border-2 border-white dark:border-gray-900"></div>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+                    𝕏
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Online
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center space-x-1">
+                <button
+                  className="w-10 h-10 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800/60 transition-colors flex items-center justify-center"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsSidebarOpen(!isSidebarOpen);
+                  }}
+                  title={isSidebarOpen ? "Close sidebar" : "Open sidebar"}
+                  data-sidebar-element="mobile-sidebar-toggle"
+                >
+                  {isSidebarOpen ? (
+                    <ChevronLeft className="h-5 w-5 text-gray-600 dark:text-gray-400 mx-auto" />
+                  ) : (
+                    <ChevronRight className="h-5 w-5 text-gray-600 dark:text-gray-400 mx-auto" />
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
-      )}
+      </div>
 
       {/* Desktop Sidebar */}
       <div
@@ -1225,15 +1217,20 @@ Please ensure the enhanced backend service is running on http://localhost:8000 a
               <div className="flex items-center space-x-4">
                 {/* Mobile Menu Toggle */}
                 <button
-                  className="md:hidden p-2.5 rounded-2xl bg-white/60 dark:bg-gray-800/60 backdrop-blur-md border border-white/20 dark:border-gray-700/30 hover:bg-white/80 dark:hover:bg-gray-700/80 transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105 flex items-center justify-center"
+                  className="md:hidden p-2 rounded-xl bg-white/80 dark:bg-gray-800/80 backdrop-blur-md border border-gray-200/40 dark:border-gray-700/40 hover:bg-white/90 dark:hover:bg-gray-700/90 transition-all duration-200 shadow hover:shadow-md flex items-center justify-center"
                   onClick={() => setIsSidebarOpen(!isSidebarOpen)}
                   title={isSidebarOpen ? "Close sidebar" : "Open sidebar"}
                 >
-                  {isSidebarOpen ? (
-                    <ChevronLeft className="h-5 w-5 text-gray-700 dark:text-gray-300 mx-auto" />
-                  ) : (
-                    <ChevronRight className="h-5 w-5 text-gray-700 dark:text-gray-300 mx-auto" />
-                  )}
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="text-white"
+                  >
+                    <path d="M11.6663 12.6686L11.801 12.6823C12.1038 12.7445 12.3313 13.0125 12.3313 13.3337C12.3311 13.6547 12.1038 13.9229 11.801 13.985L11.6663 13.9987H3.33325C2.96609 13.9987 2.66839 13.7008 2.66821 13.3337C2.66821 12.9664 2.96598 12.6686 3.33325 12.6686H11.6663ZM16.6663 6.00163L16.801 6.0153C17.1038 6.07747 17.3313 6.34546 17.3313 6.66667C17.3313 6.98788 17.1038 7.25586 16.801 7.31803L16.6663 7.33171H3.33325C2.96598 7.33171 2.66821 7.03394 2.66821 6.66667C2.66821 6.2994 2.96598 6.00163 3.33325 6.00163H16.6663Z"></path>
+                  </svg>
                 </button>
               </div>
 
