@@ -1,8 +1,31 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { ChevronDown, Zap, AlertCircle, Loader2, RefreshCw } from "lucide-react";
+import { ChevronDown, AlertCircle, Loader2 } from "lucide-react";
 import { chatAPI } from "@/lib/api";
+
+// Custom 3D Box Icon Component
+const BoxIcon = ({ className }: { className?: string }) => (
+  <svg
+    width="18"
+    height="18"
+    viewBox="-1 -1 25 25"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    className={className}
+  >
+    <path
+      d="M3.33965 17L11.9999 22L20.6602 17V7L11.9999 2L3.33965 7V17Z"
+      stroke="currentColor"
+      strokeWidth="2"
+    />
+    <path
+      d="M11.9999 12L3.4999 7M11.9999 12L12 21.5M11.9999 12L20.5 7"
+      stroke="currentColor"
+      strokeWidth="2"
+    />
+  </svg>
+);
 
 type AIModel = {
   id: string;
@@ -47,9 +70,9 @@ export const AIModelDropdown = ({
         console.log("🔄 Fetching AI models from backend...");
         const response = await chatAPI.getModels();
         console.log("✅ Models fetched successfully:", response);
-        
+
         const fetchedModels = response.models || [];
-        
+
         // Log the fetched models for debugging
         console.log("📋 Fetched models:", fetchedModels);
 
@@ -110,7 +133,7 @@ export const AIModelDropdown = ({
             description: "MoonshotAI's Kimi K2 instruction-tuned model",
           },
         ];
-        
+
         setAiModels(fallbackModels);
         console.log("🔄 Using fallback models:", fallbackModels);
       } finally {
@@ -149,9 +172,9 @@ export const AIModelDropdown = ({
       console.log("🔄 Manually refreshing AI models...");
       const response = await chatAPI.getModels();
       console.log("✅ Models refreshed successfully:", response);
-      
+
       const fetchedModels = response.models || [];
-      
+
       // Log the fetched models for debugging
       console.log("📋 Refreshed models:", fetchedModels);
       const modelsWithDefault = [
@@ -169,7 +192,7 @@ export const AIModelDropdown = ({
     } catch (err) {
       console.error("❌ Failed to refresh AI models:", err);
       setError("Failed to refresh AI models");
-      
+
       // Even on error, we should still show the current models or fallback
       // This ensures the user always sees some options
     } finally {
@@ -187,21 +210,21 @@ export const AIModelDropdown = ({
         aria-haspopup="listbox"
         aria-expanded={isOpen}
       >
-        <div className="flex items-center truncate">
+        <div className="flex items-center gap-2.5 truncate">
           {isLoading ? (
-            <Loader2 className="h-4 w-4 mr-2 text-blue-500 flex-shrink-0 animate-spin" />
+            <Loader2 className="h-[18px] w-[18px] text-gray-700 dark:text-gray-300 flex-shrink-0 animate-spin" />
           ) : error ? (
-            <AlertCircle className="h-4 w-4 mr-2 text-red-500 flex-shrink-0" />
+            <AlertCircle className="h-[18px] w-[18px] text-red-500 flex-shrink-0" />
           ) : (
-            <Zap className="h-4 w-4 mr-2 text-blue-500 flex-shrink-0" />
+            <BoxIcon className="flex-shrink-0 text-gray-700 dark:text-gray-300" />
           )}
           <span className="truncate">
             {error ? "Error loading models" : selectedModelData.name}
           </span>
         </div>
-        <div className="flex items-center space-x-1">
+        <div className="flex items-center ml-2">
           <ChevronDown
-            className={`h-4 w-4 text-gray-500 transition-transform duration-200 ${
+            className={`h-[18px] w-[18px] text-gray-500 transition-transform duration-200 ${
               isOpen ? "rotate-180" : ""
             }`}
           />
@@ -216,7 +239,7 @@ export const AIModelDropdown = ({
               <button
                 key={model.id}
                 type="button"
-                className={`w-full px-4 py-3 text-left text-sm transition-all duration-150 flex flex-col ${
+                className={`w-full px-4 py-2.5 text-left text-sm transition-all duration-150 flex flex-col gap-1 ${
                   selectedModel === model.id
                     ? "bg-blue-500/10 dark:bg-blue-500/15 border-l-4 border-blue-500"
                     : "hover:bg-gray-100/80 dark:hover:bg-gray-700/50"
@@ -233,7 +256,7 @@ export const AIModelDropdown = ({
                   <span className="font-medium text-gray-900 dark:text-gray-100 truncate">
                     {model.name}
                   </span>
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center gap-2">
                     {model.recommended && (
                       <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300 px-2 py-0.5 rounded-full">
                         Recommended
@@ -245,7 +268,7 @@ export const AIModelDropdown = ({
                   </div>
                 </div>
                 {model.provider && (
-                  <div className="flex items-center mt-1">
+                  <div className="flex items-center">
                     <span className="text-xs text-gray-500 dark:text-gray-400 truncate">
                       {model.provider}
                     </span>
@@ -257,7 +280,7 @@ export const AIModelDropdown = ({
                   </div>
                 )}
                 {model.description && (
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate">
+                  <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
                     {model.description}
                   </p>
                 )}

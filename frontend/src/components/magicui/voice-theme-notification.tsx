@@ -28,6 +28,43 @@ export function VoiceThemeNotification({
     }
   }, [isVisible, onClose, type]);
 
+  // Handle close with better mobile support
+  const handleClose = (e?: React.MouseEvent | React.TouchEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    onClose();
+  };
+
+  // Handle swipe to dismiss on mobile
+  const handleTouchStart = (e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    const startX = touch.clientX;
+    const startY = touch.clientY;
+
+    const handleTouchMove = (moveEvent: TouchEvent) => {
+      const moveTouch = moveEvent.touches[0];
+      const deltaX = moveTouch.clientX - startX;
+      const deltaY = moveTouch.clientY - startY;
+
+      // If swiping up with significant vertical movement
+      if (deltaY < -50 && Math.abs(deltaX) < 100) {
+        onClose();
+        document.removeEventListener('touchmove', handleTouchMove);
+        document.removeEventListener('touchend', handleTouchEnd);
+      }
+    };
+
+    const handleTouchEnd = () => {
+      document.removeEventListener('touchmove', handleTouchMove);
+      document.removeEventListener('touchend', handleTouchEnd);
+    };
+
+    document.addEventListener('touchmove', handleTouchMove, { passive: false });
+    document.addEventListener('touchend', handleTouchEnd);
+  };
+
   if (!isVisible) return null;
 
   // Determine if this is a sidebar notification based on the message
@@ -307,7 +344,7 @@ export function VoiceThemeNotification({
   return (
     <div 
       className={`
-        fixed top-4 left-1/2 transform -translate-x-1/2 z-50
+        fixed top-4 left-1/2 transform -translate-x-1/2 z-[9999]
         px-6 py-4 rounded-2xl backdrop-blur-md
         border transition-all duration-500
         animate-luxury-enter
@@ -315,24 +352,29 @@ export function VoiceThemeNotification({
         ${isSidebarNotification ? 'luxury-shadow-' + type : ''}
         flex items-start space-x-3
         ${isSidebarNotification ? 'min-w-[300px]' : 'max-w-md'}
+        pointer-events-auto touch-manipulation
       `}
       role="alert"
       aria-live="polite"
+      onTouchStart={handleTouchStart}
     >
       <div className={`flex-shrink-0 w-6 h-6 ${getIconColor()} luxury-icon-glow`}>
         {renderIcon()}
       </div>
-      <div className={`${isSidebarNotification ? 'text-lg' : 'text-base'} luxury-text-glow`}>
+      <div className={`flex-1 ${isSidebarNotification ? 'text-lg' : 'text-base'} luxury-text-glow`}>
         {formatMessage()}
       </div>
       <button 
-        onClick={onClose}
-        className="ml-2 text-sm opacity-70 hover:opacity-100 focus:outline-none transition-opacity duration-200 luxury-icon-glow"
-        aria-label="Close notification"
+        onClick={handleClose}
+        onTouchStart={(e) => e.stopPropagation()}
+        onTouchEnd={handleClose}
+        className="ml-2 flex-shrink-0 p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-sm opacity-70 hover:opacity-100 active:opacity-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-current transition-all duration-200 luxury-icon-glow rounded-full hover:bg-black/10 dark:hover:bg-white/10 active:bg-black/20 dark:active:bg-white/20 touch-manipulation cursor-pointer notification-close-btn"
+        aria-label="ปิดการแจ้งเตือน"
+        type="button"
       >
         <svg 
           xmlns="http://www.w3.org/2000/svg" 
-          className="h-5 w-5" 
+          className="h-6 w-6 pointer-events-none" 
           viewBox="0 0 20 20" 
           fill="currentColor"
         >

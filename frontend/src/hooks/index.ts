@@ -8,6 +8,9 @@ export { useDarkMode } from './useDarkMode';
 // Export idle detection hook
 export { useIdleDetection } from './useIdleDetection';
 
+// Export swipe gesture hook
+export { useSwipeGesture } from './useSwipeGesture';
+
 // Hook for managing chat state
 export const useChat = () => {
   const [messages, setMessages] = useState<Message[]>([]);

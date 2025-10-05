@@ -3,11 +3,18 @@
 import { useState, useEffect } from 'react';
 
 export function useDarkMode() {
-  const [isDarkMode, setIsDarkMode] = useState<boolean>(true); // Default to dark mode
-  const [systemPreference, setSystemPreference] = useState<boolean>(true);
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(false); // Start with false to match SSR
+  const [systemPreference, setSystemPreference] = useState<boolean>(false);
   const [userPreference, setUserPreference] = useState<boolean | null>(null);
+  const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
+    // Mark as hydrated to prevent hydration mismatch
+    setIsHydrated(true);
+    
+    // Only run client-side code after hydration
+    if (typeof window === 'undefined') return;
+    
     // Check localStorage for user preference
     const savedTheme = localStorage.getItem('theme');
     
@@ -29,7 +36,8 @@ export function useDarkMode() {
     const handleChange = (e: MediaQueryListEvent) => {
       setSystemPreference(e.matches);
       // Only update theme if user hasn't manually set a preference
-      if (userPreference === null) {
+      const currentUserPref = localStorage.getItem('theme');
+      if (!currentUserPref) {
         setIsDarkMode(e.matches);
       }
     };
@@ -40,18 +48,23 @@ export function useDarkMode() {
     return () => {
       mediaQuery.removeEventListener('change', handleChange);
     };
-  }, [userPreference]);
+  }, []); // Remove userPreference from dependency array to prevent infinite loop
 
   useEffect(() => {
+    // Only apply theme to document after hydration
+    if (!isHydrated || typeof window === 'undefined') return;
+    
     // Apply theme to document
     if (isDarkMode) {
       document.documentElement.classList.add('dark');
     } else {
       document.documentElement.classList.remove('dark');
     }
-  }, [isDarkMode]);
+  }, [isDarkMode, isHydrated]);
 
   const toggleDarkMode = () => {
+    if (typeof window === 'undefined') return;
+    
     const newMode = !isDarkMode;
     setIsDarkMode(newMode);
     setUserPreference(newMode);
@@ -60,10 +73,12 @@ export function useDarkMode() {
 
   // Add a function to reset to system preference
   const resetToSystemPreference = () => {
+    if (typeof window === 'undefined') return;
+    
     localStorage.removeItem('theme');
     setUserPreference(null);
     setIsDarkMode(systemPreference);
   };
 
-  return { isDarkMode, toggleDarkMode, resetToSystemPreference };
+  return { isDarkMode, toggleDarkMode, resetToSystemPreference, isHydrated };
 }

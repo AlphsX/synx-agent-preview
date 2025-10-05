@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from "react";
 
 interface UseIdleDetectionOptions {
   idleTime?: number; // milliseconds, default 3000
@@ -19,7 +19,7 @@ export function useIdleDetection(
 ): UseIdleDetectionReturn {
   const {
     idleTime = 3000,
-    events = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart'],
+    events = ["mousemove", "mousedown", "keydown", "scroll", "touchstart"],
   } = options;
 
   const [isIdle, setIsIdle] = useState(false);
@@ -71,6 +71,9 @@ export function useIdleDetection(
   }, [startTimer, clearDebounceTimer]);
 
   useEffect(() => {
+    // Only run on client-side
+    if (typeof window === "undefined") return;
+
     // Start initial timer
     startTimer();
 
@@ -81,7 +84,10 @@ export function useIdleDetection(
           window.addEventListener(event, handleActivity, { passive: true });
         });
       } catch (error) {
-        console.error('Failed to attach idle detection event listeners:', error);
+        console.error(
+          "Failed to attach idle detection event listeners:",
+          error
+        );
       }
     };
 
@@ -92,10 +98,12 @@ export function useIdleDetection(
       clearTimer();
       clearDebounceTimer();
 
-      // Remove event listeners
-      events.forEach((event) => {
-        window.removeEventListener(event, handleActivity);
-      });
+      // Remove event listeners only if window exists
+      if (typeof window !== "undefined") {
+        events.forEach((event) => {
+          window.removeEventListener(event, handleActivity);
+        });
+      }
     };
   }, [events, handleActivity, startTimer, clearTimer, clearDebounceTimer]);
 

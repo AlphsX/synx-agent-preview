@@ -8,11 +8,34 @@ import {
   User,
   Mic,
   Plus,
-  Zap,
   ChevronLeft,
   ChevronRight,
+  Zap,
 } from "lucide-react";
-import { useDarkMode } from "@/hooks";
+
+// Custom Logo Icon Component
+const LogoIcon = ({ className }: { className?: string }) => (
+  <svg
+    width="35"
+    height="33"
+    viewBox="0 0 35 33"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    className={className}
+  >
+    <path
+      d="M13.2371 21.0407L24.3186 12.8506C24.8619 12.4491 25.6384 12.6057 25.8973 13.2294C27.2597 16.5185 26.651 20.4712 23.9403 23.1851C21.2297 25.8989 17.4581 26.4941 14.0108 25.1386L10.2449 26.8843C15.6463 30.5806 22.2053 29.6665 26.304 25.5601C29.5551 22.3051 30.562 17.8683 29.6205 13.8673L29.629 13.8758C28.2637 7.99809 29.9647 5.64871 33.449 0.844576C33.5314 0.730667 33.6139 0.616757 33.6964 0.5L29.1113 5.09055V5.07631L13.2343 21.0436"
+      fill="currentColor"
+      id="mark"
+    />
+    <path
+      d="M10.9503 23.0313C7.07343 19.3235 7.74185 13.5853 11.0498 10.2763C13.4959 7.82722 17.5036 6.82767 21.0021 8.2971L24.7595 6.55998C24.0826 6.07017 23.215 5.54334 22.2195 5.17313C17.7198 3.31926 12.3326 4.24192 8.67479 7.90126C5.15635 11.4239 4.0499 16.8403 5.94992 21.4622C7.36924 24.9165 5.04257 27.3598 2.69884 29.826C1.86829 30.7002 1.0349 31.5745 0.36364 32.5L10.9474 23.0341"
+      fill="currentColor"
+      id="mark"
+    />
+  </svg>
+);
+import { useDarkMode, useSwipeGesture } from "@/hooks";
 import {
   AnimatedThemeToggler,
   VoiceThemeNotification,
@@ -21,15 +44,9 @@ import {
 } from "@/components/magicui";
 import { AIModelDropdown } from "@/components/magicui/ai-model-dropdown";
 import { chatAPI } from "@/lib/api";
-import {
-  testEnhancedBackend,
-  testStreamingChat,
-} from "@/lib/test-enhanced-api";
 import { StreamingRenderer } from "@/components/chat/StreamingRenderer";
-import { MessageRenderer } from "@/components/chat/MessageRenderer";
 import { EnhancedMessage, FormattingMetadata } from "@/types/markdown";
 import { analyzeMarkdownFeatures } from "@/lib/markdown-utils";
-import { FallbackResponseGenerator } from "@/lib/fallback-responses";
 import { IdleMeteorAnimation } from "@/components/ui/idle-meteor-animation";
 
 // Type definitions for SpeechRecognition API
@@ -472,6 +489,34 @@ Please ensure the enhanced backend service is running on http://localhost:8000 a
     fetchModels();
   }, [selectedModel]);
 
+  // Create refs for state values to avoid stale closures
+  const isDarkModeRef = useRef(isDarkMode);
+  const isSidebarOpenRef = useRef(isSidebarOpen);
+  const isDesktopSidebarCollapsedRef = useRef(isDesktopSidebarCollapsed);
+  const toggleDarkModeRef = useRef(toggleDarkMode);
+  const isListeningRef = useRef(isListening);
+
+  // Update refs when state changes
+  useEffect(() => {
+    isDarkModeRef.current = isDarkMode;
+  }, [isDarkMode]);
+
+  useEffect(() => {
+    isSidebarOpenRef.current = isSidebarOpen;
+  }, [isSidebarOpen]);
+
+  useEffect(() => {
+    isDesktopSidebarCollapsedRef.current = isDesktopSidebarCollapsed;
+  }, [isDesktopSidebarCollapsed]);
+
+  useEffect(() => {
+    toggleDarkModeRef.current = toggleDarkMode;
+  }, [toggleDarkMode]);
+
+  useEffect(() => {
+    isListeningRef.current = isListening;
+  }, [isListening]);
+
   // Initialize SpeechRecognition API
   useEffect(() => {
     // Check if browser supports SpeechRecognition
@@ -484,7 +529,7 @@ Please ensure the enhanced backend service is running on http://localhost:8000 a
         isVisible: true,
         message:
           "Speech recognition not supported in this browser. Please try Chrome, Edge, or Safari.",
-        theme: isDarkMode ? "dark" : "light",
+        theme: isDarkModeRef.current ? "dark" : "light",
         type: "error",
       });
       return;
@@ -510,8 +555,8 @@ Please ensure the enhanced backend service is running on http://localhost:8000 a
       const lowerTranscript = transcript.toLowerCase().trim();
       if (lowerTranscript === "system switch dark mode") {
         // Switch to dark mode if not already in dark mode
-        if (!isDarkMode) {
-          toggleDarkMode();
+        if (!isDarkModeRef.current) {
+          toggleDarkModeRef.current();
           setVoiceThemeNotification({
             isVisible: true,
             message: "Switched to dark mode",
@@ -530,8 +575,8 @@ Please ensure the enhanced backend service is running on http://localhost:8000 a
         return; // Don't set input text for voice commands
       } else if (lowerTranscript === "system switch light mode") {
         // Switch to light mode if not already in light mode
-        if (isDarkMode) {
-          toggleDarkMode();
+        if (isDarkModeRef.current) {
+          toggleDarkModeRef.current();
           setVoiceThemeNotification({
             isVisible: true,
             message: "Switched to light mode",
@@ -555,8 +600,8 @@ Please ensure the enhanced backend service is running on http://localhost:8000 a
         return; // Don't set input text for voice commands
       } else if (lowerTranscript === "system close sidebar") {
         // Close sidebar for both mobile and desktop
-        const mobileAlreadyClosed = !isSidebarOpen;
-        const desktopAlreadyClosed = isDesktopSidebarCollapsed;
+        const mobileAlreadyClosed = !isSidebarOpenRef.current;
+        const desktopAlreadyClosed = isDesktopSidebarCollapsedRef.current;
 
         setIsSidebarOpen(false);
         setIsDesktopSidebarCollapsed(true);
@@ -566,14 +611,14 @@ Please ensure the enhanced backend service is running on http://localhost:8000 a
           setVoiceThemeNotification({
             isVisible: true,
             message: "Sidebar already closed",
-            theme: isDarkMode ? "dark" : "light",
+            theme: isDarkModeRef.current ? "dark" : "light",
             type: "info",
           });
         } else {
           setVoiceThemeNotification({
             isVisible: true,
             message: "Sidebar closed",
-            theme: isDarkMode ? "dark" : "light",
+            theme: isDarkModeRef.current ? "dark" : "light",
             type: "success",
           });
         }
@@ -581,8 +626,8 @@ Please ensure the enhanced backend service is running on http://localhost:8000 a
         return; // Don't set input text for voice commands
       } else if (lowerTranscript === "system open sidebar") {
         // Open sidebar for both mobile and desktop
-        const mobileAlreadyOpen = isSidebarOpen;
-        const desktopAlreadyOpen = !isDesktopSidebarCollapsed;
+        const mobileAlreadyOpen = isSidebarOpenRef.current;
+        const desktopAlreadyOpen = !isDesktopSidebarCollapsedRef.current;
 
         setIsSidebarOpen(true);
         setIsDesktopSidebarCollapsed(false);
@@ -592,14 +637,14 @@ Please ensure the enhanced backend service is running on http://localhost:8000 a
           setVoiceThemeNotification({
             isVisible: true,
             message: "Sidebar already open",
-            theme: isDarkMode ? "dark" : "light",
+            theme: isDarkModeRef.current ? "dark" : "light",
             type: "info",
           });
         } else {
           setVoiceThemeNotification({
             isVisible: true,
             message: "Sidebar opened",
-            theme: isDarkMode ? "dark" : "light",
+            theme: isDarkModeRef.current ? "dark" : "light",
             type: "success",
           });
         }
@@ -650,7 +695,7 @@ Please ensure the enhanced backend service is running on http://localhost:8000 a
         setVoiceThemeNotification({
           isVisible: true,
           message: errorMessage,
-          theme: isDarkMode ? "dark" : "light",
+          theme: isDarkModeRef.current ? "dark" : "light",
           type: "error",
         });
 
@@ -689,7 +734,7 @@ Please ensure the enhanced backend service is running on http://localhost:8000 a
         speechRecognitionRef.current = null;
       }
     };
-  }, [isDarkMode, isDesktopSidebarCollapsed, isSidebarOpen, toggleDarkMode]);
+  }, []); // Remove dependencies to prevent infinite re-render
 
   const toggleVoiceRecognition = useCallback(() => {
     // Check if browser supports SpeechRecognition
@@ -701,7 +746,7 @@ Please ensure the enhanced backend service is running on http://localhost:8000 a
         isVisible: true,
         message:
           "Speech recognition not supported in this browser. Please try Chrome, Edge, or Safari.",
-        theme: isDarkMode ? "dark" : "light",
+        theme: isDarkModeRef.current ? "dark" : "light",
         type: "error",
       });
       return;
@@ -711,13 +756,13 @@ Please ensure the enhanced backend service is running on http://localhost:8000 a
       setVoiceThemeNotification({
         isVisible: true,
         message: "Speech recognition not initialized properly",
-        theme: isDarkMode ? "dark" : "light",
+        theme: isDarkModeRef.current ? "dark" : "light",
         type: "error",
       });
       return;
     }
 
-    if (isListening) {
+    if (isListeningRef.current) {
       // Stop listening
       try {
         // Reset the starting flag when stopping
@@ -774,7 +819,7 @@ Please ensure the enhanced backend service is running on http://localhost:8000 a
           setVoiceThemeNotification({
             isVisible: true,
             message: errorMessage,
-            theme: isDarkMode ? "dark" : "light",
+            theme: isDarkModeRef.current ? "dark" : "light",
             type: "error",
           });
 
@@ -788,7 +833,7 @@ Please ensure the enhanced backend service is running on http://localhost:8000 a
         }
       }
     }
-  });
+  }, []);
 
   // Keyboard shortcut to focus input field (⌘+J on Mac, Ctrl+J on Windows/Linux)
   // and to trigger voice recognition (Cmd+Enter on Mac, Ctrl+Enter on Windows/Linux)
@@ -820,8 +865,50 @@ Please ensure the enhanced backend service is running on http://localhost:8000 a
     };
   }, [isListening, toggleVoiceRecognition]);
 
+  // Setup swipe gestures for mobile sidebar
+  const { attachToElement } = useSwipeGesture({
+    onSwipeRight: () => {
+      // Open sidebar on swipe right (only on mobile)
+      if (window.innerWidth < 768) {
+        setIsSidebarOpen(true);
+        setVoiceThemeNotification({
+          isVisible: true,
+          message: "Sidebar opened",
+          theme: isDarkModeRef.current ? "dark" : "light",
+          type: "success",
+        });
+      }
+    },
+    onSwipeLeft: () => {
+      // Close sidebar on swipe left (only on mobile)
+      if (window.innerWidth < 768) {
+        setIsSidebarOpen(false);
+        setVoiceThemeNotification({
+          isVisible: true,
+          message: "Sidebar closed",
+          theme: isDarkModeRef.current ? "dark" : "light",
+          type: "success",
+        });
+      }
+    },
+    threshold: 80, // Minimum swipe distance
+    velocityThreshold: 0.4, // Minimum swipe velocity
+  });
+
+  // Attach swipe gesture to main container
+  const mainContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (mainContainerRef.current) {
+      attachToElement(mainContainerRef.current);
+    }
+  }, [attachToElement]);
+
   return (
-    <div className="flex h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-1000 dark:via-gray-950 dark:to-gray-900 text-gray-900 dark:text-gray-50 transition-all duration-500">
+    <div
+      ref={mainContainerRef}
+      className="flex h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-1000 dark:via-gray-950 dark:to-gray-900 text-gray-900 dark:text-gray-50 transition-all duration-500"
+    >
       {/* Mobile Sidebar Overlay */}
       <div
         className={`md:hidden fixed inset-0 z-50 flex transition-opacity duration-300 ${
@@ -849,7 +936,7 @@ Please ensure the enhanced backend service is running on http://localhost:8000 a
             <div className="flex items-center justify-start">
               <div className="relative">
                 <div
-                  className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-r from-blue-600 to-blue-700 dark:from-blue-500 dark:to-blue-600 shadow-md cursor-pointer hover:scale-105 transition-transform duration-200"
+                  className="flex items-center justify-center cursor-pointer hover:scale-105 transition-transform duration-200"
                   onClick={(e) => {
                     e.stopPropagation(); // Prevent sidebar toggle when clicking logo
                     setMessages([]);
@@ -859,7 +946,7 @@ Please ensure the enhanced backend service is running on http://localhost:8000 a
                   }}
                   data-sidebar-element="logo"
                 >
-                  <Zap className="h-5 w-5 text-white mx-auto" />
+                  <LogoIcon className="h-8 w-8 text-gray-800 dark:text-gray-200 mx-auto" />
                 </div>
               </div>
             </div>
@@ -1005,8 +1092,7 @@ Please ensure the enhanced backend service is running on http://localhost:8000 a
             >
               <div className="relative">
                 <div
-                  className="flex h-10 w-10 items-center justify-center rounded-2xl 
-                  bg-gradient-to-r from-blue-600 to-blue-700 dark:from-blue-500 dark:to-blue-600 shadow-md cursor-pointer hover:scale-105 transition-transform duration-200"
+                  className="flex items-center justify-center cursor-pointer hover:scale-105 transition-transform duration-200"
                   onClick={(e) => {
                     e.stopPropagation(); // Prevent sidebar toggle when clicking logo
                     setMessages([]);
@@ -1016,7 +1102,7 @@ Please ensure the enhanced backend service is running on http://localhost:8000 a
                   }}
                   data-sidebar-element="logo"
                 >
-                  <Zap className="h-5 w-5 text-white mx-auto" />
+                  <LogoIcon className="h-8 w-8 text-gray-800 dark:text-gray-200 mx-auto" />
                 </div>
               </div>
             </div>
@@ -1228,7 +1314,7 @@ Please ensure the enhanced backend service is running on http://localhost:8000 a
                     viewBox="0 0 20 20"
                     fill="currentColor"
                     xmlns="http://www.w3.org/2000/svg"
-                    className="text-white"
+                    className="text-gray-700 dark:text-gray-200"
                   >
                     <path d="M11.6663 12.6686L11.801 12.6823C12.1038 12.7445 12.3313 13.0125 12.3313 13.3337C12.3311 13.6547 12.1038 13.9229 11.801 13.985L11.6663 13.9987H3.33325C2.96609 13.9987 2.66839 13.7008 2.66821 13.3337C2.66821 12.9664 2.96598 12.6686 3.33325 12.6686H11.6663ZM16.6663 6.00163L16.801 6.0153C17.1038 6.07747 17.3313 6.34546 17.3313 6.66667C17.3313 6.98788 17.1038 7.25586 16.801 7.31803L16.6663 7.33171H3.33325C2.96598 7.33171 2.66821 7.03394 2.66821 6.66667C2.66821 6.2994 2.96598 6.00163 3.33325 6.00163H16.6663Z"></path>
                   </svg>
@@ -1274,8 +1360,8 @@ Please ensure the enhanced backend service is running on http://localhost:8000 a
             <div className="flex-1 flex items-center justify-center p-8 animate-fade-in-up">
               <div className="text-center max-w-2xl">
                 <div className="mb-8">
-                  <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-gradient-to-r from-blue-600 to-blue-700 dark:from-blue-500 dark:to-blue-600 shadow-xl mb-6">
-                    <Zap className="h-10 w-10 text-white mx-auto" />
+                  <div className="inline-flex items-center justify-center mb-6">
+                    <LogoIcon className="h-16 w-16 text-gray-800 dark:text-gray-200 mx-auto" />
                   </div>
                   <h1 className="text-4xl font-bold mb-4">
                     <AuroraText>Hey there, I&apos;m Synx!</AuroraText>

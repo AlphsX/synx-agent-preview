@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { useIdleDetection } from '@/hooks/useIdleDetection';
-import { Meteors } from './meteors';
+import React, { useState, useEffect } from "react";
+import { useIdleDetection } from "@/hooks/useIdleDetection";
+import { Meteors } from "./meteors";
 
 interface IdleMeteorAnimationProps {
   showWelcome: boolean; // only show when welcome screen is visible
@@ -21,8 +21,8 @@ export const IdleMeteorAnimation: React.FC<IdleMeteorAnimationProps> = ({
 
   // Check for prefers-reduced-motion preference
   useEffect(() => {
-    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
-    
+    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+
     // Set initial value
     setPrefersReducedMotion(mediaQuery.matches);
 
@@ -32,8 +32,8 @@ export const IdleMeteorAnimation: React.FC<IdleMeteorAnimationProps> = ({
     };
 
     // Use modern addEventListener (supported in all modern browsers)
-    mediaQuery.addEventListener('change', handleChange);
-    return () => mediaQuery.removeEventListener('change', handleChange);
+    mediaQuery.addEventListener("change", handleChange);
+    return () => mediaQuery.removeEventListener("change", handleChange);
   }, []);
 
   // Don't render if user prefers reduced motion
