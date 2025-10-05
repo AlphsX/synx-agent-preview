@@ -5,6 +5,9 @@ import { chatAPI, externalAPI, type Message, type AIModel, type Conversation } f
 // Export dark mode hook
 export { useDarkMode } from './useDarkMode';
 
+// Export idle detection hook
+export { useIdleDetection } from './useIdleDetection';
+
 // Hook for managing chat state
 export const useChat = () => {
   const [messages, setMessages] = useState<Message[]>([]);

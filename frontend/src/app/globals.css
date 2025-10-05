@@ -205,6 +205,24 @@ body {
   }
 }
 
+/* Meteor animation for idle state */
+@keyframes meteor-effect {
+  0% {
+    transform: rotate(215deg) translateX(0);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    transform: rotate(215deg) translateX(-800px);
+    opacity: 0;
+  }
+}
+
 /* Utility classes */
 .animate-fadeInUp {
   animation: fadeInUp 0.6s cubic-bezier(0.4, 0, 0.2, 1);
@@ -231,6 +249,14 @@ body {
 
 .animate-aurora-btn {
   animation: aurora-btn 8s ease-in-out infinite;
+}
+
+.animate-meteor {
+  animation: meteor linear forwards;
+}
+
+.animate-meteor-effect {
+  animation: meteor-effect linear infinite;
 }
 
 /* Glass morphism effect */

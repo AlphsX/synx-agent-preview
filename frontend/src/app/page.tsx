@@ -30,6 +30,7 @@ import { MessageRenderer } from "@/components/chat/MessageRenderer";
 import { EnhancedMessage, FormattingMetadata } from "@/types/markdown";
 import { analyzeMarkdownFeatures } from "@/lib/markdown-utils";
 import { FallbackResponseGenerator } from "@/lib/fallback-responses";
+import { IdleMeteorAnimation } from "@/components/ui/idle-meteor-animation";
 
 // Type definitions for SpeechRecognition API
 interface SpeechRecognitionEvent extends Event {
@@ -1534,6 +1535,9 @@ Please ensure the enhanced backend service is running on http://localhost:8000 a
           </div>
         </div>
       </div>
+
+      {/* Idle Meteor Animation - overlays welcome screen when user is idle */}
+      <IdleMeteorAnimation showWelcome={showWelcome} />
     </div>
   );
 }
