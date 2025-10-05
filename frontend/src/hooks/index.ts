@@ -5,6 +5,9 @@ import { chatAPI, externalAPI, type Message, type AIModel, type Conversation } f
 // Export dark mode hook
 export { useDarkMode } from './useDarkMode';
 
+// Export dynamic favicon hook
+export { useDynamicFavicon } from './useDynamicFavicon';
+
 // Export idle detection hook
 export { useIdleDetection } from './useIdleDetection';
 

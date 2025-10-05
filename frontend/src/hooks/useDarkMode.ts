@@ -8,6 +8,9 @@ export function useDarkMode() {
   const [userPreference, setUserPreference] = useState<boolean | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
 
+  // Check if currently using system preference (no user override)
+  const isUsingSystemPreference = userPreference === null;
+
   useEffect(() => {
     // Mark as hydrated to prevent hydration mismatch
     setIsHydrated(true);
@@ -15,29 +18,35 @@ export function useDarkMode() {
     // Only run client-side code after hydration
     if (typeof window === 'undefined') return;
     
-    // Check localStorage for user preference
-    const savedTheme = localStorage.getItem('theme');
-    
     // Get initial system preference
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
     setSystemPreference(prefersDark);
     
-    if (savedTheme) {
+    // Check localStorage for user preference
+    const savedTheme = localStorage.getItem('theme');
+    
+    if (savedTheme && savedTheme !== 'system') {
+      // User has manually set a preference
       const savedValue = savedTheme === 'dark';
       setIsDarkMode(savedValue);
       setUserPreference(savedValue);
     } else {
+      // Use system preference as default
       setIsDarkMode(prefersDark);
       setUserPreference(null);
+      // Ensure localStorage reflects system preference as default
+      if (!savedTheme) {
+        localStorage.setItem('theme', 'system');
+      }
     }
     
     // Listen for system preference changes
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     const handleChange = (e: MediaQueryListEvent) => {
       setSystemPreference(e.matches);
-      // Only update theme if user hasn't manually set a preference
+      // Only update theme if user is using system preference
       const currentUserPref = localStorage.getItem('theme');
-      if (!currentUserPref) {
+      if (!currentUserPref || currentUserPref === 'system') {
         setIsDarkMode(e.matches);
       }
     };
@@ -48,7 +57,7 @@ export function useDarkMode() {
     return () => {
       mediaQuery.removeEventListener('change', handleChange);
     };
-  }, []); // Remove userPreference from dependency array to prevent infinite loop
+  }, []);
 
   useEffect(() => {
     // Only apply theme to document after hydration
@@ -75,10 +84,17 @@ export function useDarkMode() {
   const resetToSystemPreference = () => {
     if (typeof window === 'undefined') return;
     
-    localStorage.removeItem('theme');
+    localStorage.setItem('theme', 'system');
     setUserPreference(null);
     setIsDarkMode(systemPreference);
   };
 
-  return { isDarkMode, toggleDarkMode, resetToSystemPreference, isHydrated };
+  return { 
+    isDarkMode, 
+    toggleDarkMode, 
+    resetToSystemPreference, 
+    isUsingSystemPreference,
+    systemPreference,
+    isHydrated 
+  };
 }

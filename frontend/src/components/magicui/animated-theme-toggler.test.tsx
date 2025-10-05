@@ -26,6 +26,15 @@ describe('AnimatedThemeToggler', () => {
     expect(screen.getByRole('button')).toBeInTheDocument();
   });
 
+  it('renders correctly with system preference', () => {
+    const toggleDarkMode = jest.fn();
+    render(<AnimatedThemeToggler isDarkMode={false} toggleDarkMode={toggleDarkMode} isUsingSystemPreference={true} />);
+    
+    // Check if the component renders
+    expect(screen.getByRole('button')).toBeInTheDocument();
+    expect(screen.getByRole('button')).toHaveAttribute('aria-label', 'Using system theme preference');
+  });
+
   it('calls toggleDarkMode when clicked', () => {
     const toggleDarkMode = jest.fn();
     render(<AnimatedThemeToggler isDarkMode={false} toggleDarkMode={toggleDarkMode} />);
@@ -47,5 +56,9 @@ describe('AnimatedThemeToggler', () => {
     // Test dark mode label
     rerender(<AnimatedThemeToggler isDarkMode={true} toggleDarkMode={toggleDarkMode} />);
     expect(screen.getByRole('button')).toHaveAttribute('aria-label', 'Switch to light mode');
+    
+    // Test system preference label
+    rerender(<AnimatedThemeToggler isDarkMode={false} toggleDarkMode={toggleDarkMode} isUsingSystemPreference={true} />);
+    expect(screen.getByRole('button')).toHaveAttribute('aria-label', 'Using system theme preference');
   });
 });

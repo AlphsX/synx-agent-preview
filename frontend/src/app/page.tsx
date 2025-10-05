@@ -27,37 +27,37 @@ const LogoIcon = ({ className }: { className?: string }) => (
       fill="currentColor"
       id="mark"
     />
-    <path
+    {/* <path
       d="M10.9503 23.0313C7.07343 19.3235 7.74185 13.5853 11.0498 10.2763C13.4959 7.82722 17.5036 6.82767 21.0021 8.2971L24.7595 6.55998C24.0826 6.07017 23.215 5.54334 22.2195 5.17313C17.7198 3.31926 12.3326 4.24192 8.67479 7.90126C5.15635 11.4239 4.0499 16.8403 5.94992 21.4622C7.36924 24.9165 5.04257 27.3598 2.69884 29.826C1.86829 30.7002 1.0349 31.5745 0.36364 32.5L10.9474 23.0341"
       fill="currentColor"
       id="mark"
-    />
+    /> */}
   </svg>
 );
 
 // Custom New Chat Icon Component
 const NewChatIcon = ({ className }: { className?: string }) => (
-  <svg 
-    width="18" 
-    height="18" 
-    viewBox="0 0 24 24" 
-    fill="none" 
-    xmlns="http://www.w3.org/2000/svg" 
+  <svg
+    width="18"
+    height="18"
+    viewBox="0 0 24 24"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
     className={`stroke-[2] ${className}`}
   >
-    <path 
-      d="M10 4V4C8.13623 4 7.20435 4 6.46927 4.30448C5.48915 4.71046 4.71046 5.48915 4.30448 6.46927C4 7.20435 4 8.13623 4 10V13.6C4 15.8402 4 16.9603 4.43597 17.816C4.81947 18.5686 5.43139 19.1805 6.18404 19.564C7.03968 20 8.15979 20 10.4 20H14C15.8638 20 16.7956 20 17.5307 19.6955C18.5108 19.2895 19.2895 18.5108 19.6955 17.5307C20 16.7956 20 15.8638 20 14V14" 
-      stroke="currentColor" 
+    <path
+      d="M10 4V4C8.13623 4 7.20435 4 6.46927 4.30448C5.48915 4.71046 4.71046 5.48915 4.30448 6.46927C4 7.20435 4 8.13623 4 10V13.6C4 15.8402 4 16.9603 4.43597 17.816C4.81947 18.5686 5.43139 19.1805 6.18404 19.564C7.03968 20 8.15979 20 10.4 20H14C15.8638 20 16.7956 20 17.5307 19.6955C18.5108 19.2895 19.2895 18.5108 19.6955 17.5307C20 16.7956 20 15.8638 20 14V14"
+      stroke="currentColor"
       strokeLinecap="square"
     />
-    <path 
-      d="M12.4393 14.5607L19.5 7.5C20.3284 6.67157 20.3284 5.32843 19.5 4.5C18.6716 3.67157 17.3284 3.67157 16.5 4.5L9.43934 11.5607C9.15804 11.842 9 12.2235 9 12.6213V15H11.3787C11.7765 15 12.158 14.842 12.4393 14.5607Z" 
-      stroke="currentColor" 
+    <path
+      d="M12.4393 14.5607L19.5 7.5C20.3284 6.67157 20.3284 5.32843 19.5 4.5C18.6716 3.67157 17.3284 3.67157 16.5 4.5L9.43934 11.5607C9.15804 11.842 9 12.2235 9 12.6213V15H11.3787C11.7765 15 12.158 14.842 12.4393 14.5607Z"
+      stroke="currentColor"
       strokeLinecap="square"
     />
   </svg>
 );
-import { useDarkMode, useSwipeGesture } from "@/hooks";
+import { useDarkMode, useSwipeGesture, useDynamicFavicon } from "@/hooks";
 import {
   AnimatedThemeToggler,
   VoiceThemeNotification,
@@ -143,7 +143,10 @@ interface AIModel {
 }
 
 export default function Home() {
-  const { isDarkMode, toggleDarkMode } = useDarkMode();
+  const { isDarkMode, toggleDarkMode, isUsingSystemPreference } = useDarkMode();
+  
+  // Dynamic favicon based on theme
+  useDynamicFavicon(isDarkMode);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -156,6 +159,7 @@ export default function Home() {
   const [availableModels, setAvailableModels] = useState<AIModel[]>([]);
   const [lastClickTime, setLastClickTime] = useState<number>(0);
   const [lastClickedPrompt, setLastClickedPrompt] = useState<string>("");
+  const [isHydrated, setIsHydrated] = useState(false);
 
   // Voice recognition state variables
   const [isListening, setIsListening] = useState(false);
@@ -177,205 +181,221 @@ export default function Home() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
+  // Generate stable IDs for messages to prevent hydration issues
+  const generateMessageId = useCallback(() => {
+    if (!isHydrated) return `temp-${Math.random()}`;
+    return `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  }, [isHydrated]);
+
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!inputText.trim() || isLoading) return;
+  // Hydration effect
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
 
-    // Hide welcome screen after first prompt submission
-    setShowWelcome(false);
+  const handleSubmit = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!inputText.trim() || isLoading) return;
 
-    // Analyze user message for markdown features
-    const userMessageFeatures = analyzeMarkdownFeatures(inputText);
+      // Hide welcome screen after first prompt submission
+      setShowWelcome(false);
 
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      content: inputText,
-      role: "user",
-      timestamp: new Date(),
-      formattingMetadata: {
-        hasHeaders: userMessageFeatures.hasHeaders,
-        hasLists: userMessageFeatures.hasLists,
-        hasTables: userMessageFeatures.hasTables,
-        hasLinks: userMessageFeatures.hasLinks,
-        hasBlockquotes: userMessageFeatures.hasBlockquotes,
-        estimatedReadTime: userMessageFeatures.estimatedReadTime,
-      },
-    };
+      // Analyze user message for markdown features
+      const userMessageFeatures = analyzeMarkdownFeatures(inputText);
 
-    setMessages((prev) => [...prev, userMessage]);
-    const messageContent = inputText;
-    setInputText("");
-    setIsLoading(true);
-
-    // Create AI response message that will be updated with streaming content
-    const aiMessageId = (Date.now() + 1).toString();
-    const aiMessage: Message = {
-      id: aiMessageId,
-      content: "",
-      role: "assistant",
-      timestamp: new Date(),
-      model: selectedModel,
-      isStreaming: true,
-      formattingMetadata: {
-        hasHeaders: false,
-        hasLists: false,
-        hasTables: false,
-        hasLinks: false,
-        hasBlockquotes: false,
-        estimatedReadTime: 0,
-      },
-    };
-
-    setMessages((prev) => [...prev, aiMessage]);
-
-    try {
-      // Use enhanced chat API with streaming
-      const conversationId = "default-conversation"; // In production, this would be managed properly
-
-      await chatAPI.streamChat(
-        conversationId,
-        messageContent,
-        selectedModel,
-        // onChunk - update the AI message content as chunks arrive
-        (chunk: string) => {
-          setMessages((prev) =>
-            prev.map((msg) => {
-              if (msg.id === aiMessageId) {
-                const updatedContent = msg.content + chunk;
-                const updatedFeatures = analyzeMarkdownFeatures(updatedContent);
-                return {
-                  ...msg,
-                  content: updatedContent,
-                  isStreaming: true,
-                  formattingMetadata: {
-                    hasHeaders: updatedFeatures.hasHeaders,
-                    hasLists: updatedFeatures.hasLists,
-                    hasTables: updatedFeatures.hasTables,
-                    hasLinks: updatedFeatures.hasLinks,
-                    hasBlockquotes: updatedFeatures.hasBlockquotes,
-                    estimatedReadTime: updatedFeatures.estimatedReadTime,
-                  },
-                };
-              }
-              return msg;
-            })
-          );
+      const userMessage: Message = {
+        id: generateMessageId(),
+        content: inputText,
+        role: "user",
+        timestamp: new Date(),
+        formattingMetadata: {
+          hasHeaders: userMessageFeatures.hasHeaders,
+          hasLists: userMessageFeatures.hasLists,
+          hasTables: userMessageFeatures.hasTables,
+          hasLinks: userMessageFeatures.hasLinks,
+          hasBlockquotes: userMessageFeatures.hasBlockquotes,
+          estimatedReadTime: userMessageFeatures.estimatedReadTime,
         },
-        // onComplete - finalize the response
-        (data: unknown) => {
-          console.log("Enhanced chat stream completed:", data);
-          setMessages((prev) =>
-            prev.map((msg) => {
-              if (msg.id === aiMessageId) {
-                const finalFeatures = analyzeMarkdownFeatures(msg.content);
-                return {
-                  ...msg,
-                  isStreaming: false,
-                  formattingMetadata: {
-                    hasHeaders: finalFeatures.hasHeaders,
-                    hasLists: finalFeatures.hasLists,
-                    hasTables: finalFeatures.hasTables,
-                    hasLinks: finalFeatures.hasLinks,
-                    hasBlockquotes: finalFeatures.hasBlockquotes,
-                    estimatedReadTime: finalFeatures.estimatedReadTime,
-                  },
-                };
-              }
-              return msg;
-            })
-          );
-          setIsLoading(false);
+      };
+
+      setMessages((prev) => [...prev, userMessage]);
+      const messageContent = inputText;
+      setInputText("");
+      setIsLoading(true);
+
+      // Create AI response message that will be updated with streaming content
+      const aiMessageId = generateMessageId();
+      const aiMessage: Message = {
+        id: aiMessageId,
+        content: "",
+        role: "assistant",
+        timestamp: new Date(),
+        model: selectedModel,
+        isStreaming: true,
+        formattingMetadata: {
+          hasHeaders: false,
+          hasLists: false,
+          hasTables: false,
+          hasLinks: false,
+          hasBlockquotes: false,
+          estimatedReadTime: 0,
         },
-        // onError - handle errors with better user experience
-        (error: string) => {
-          console.error("Enhanced chat stream error:", error);
+      };
 
-          // Create a more user-friendly error message
-          let friendlyError = "";
-          if (error.includes("NoneType") || error.includes("subscriptable")) {
-            friendlyError =
-              "Sorry, there was an error processing the data 😅 Let me try to answer your question with my available knowledge instead! 💫\n\n";
+      setMessages((prev) => [...prev, aiMessage]);
 
-            // Try to provide a helpful response based on the query
-            const query = messageContent.toLowerCase();
-            if (
-              query.includes("trending") ||
-              query.includes("news") ||
-              query.includes("latest")
-            ) {
-              friendlyError +=
-                "For the latest information and news, I recommend:\n\n";
-              friendlyError +=
-                "📰 **Tech News**: TechCrunch, The Verge, Wired\n";
-              friendlyError +=
-                "🤖 **AI Development**: OpenAI Blog, Google AI Blog, Anthropic\n";
-              friendlyError +=
-                "🌐 **Trending Topics**: Twitter Trends, Reddit Popular, Google Trends\n\n";
-              friendlyError +=
-                'Or try asking more specific questions like "Explain the latest AI technology" instead! 😊';
-            } else if (query.includes("crypto") || query.includes("bitcoin")) {
-              friendlyError += "For Cryptocurrency information:\n\n";
-              friendlyError +=
-                "💰 **Current Bitcoin Price**: Around $43,000-$45,000 USD\n";
-              friendlyError +=
-                "📈 **Trend**: Crypto market is highly volatile\n";
-              friendlyError +=
-                "🔍 **Data Sources**: CoinGecko, CoinMarketCap, Binance\n\n";
-              friendlyError +=
-                'Try asking more specific questions like "Explain blockchain technology"! 😊';
+      try {
+        // Use enhanced chat API with streaming
+        const conversationId = "default-conversation"; // In production, this would be managed properly
+
+        await chatAPI.streamChat(
+          conversationId,
+          messageContent,
+          selectedModel,
+          // onChunk - update the AI message content as chunks arrive
+          (chunk: string) => {
+            setMessages((prev) =>
+              prev.map((msg) => {
+                if (msg.id === aiMessageId) {
+                  const updatedContent = msg.content + chunk;
+                  const updatedFeatures =
+                    analyzeMarkdownFeatures(updatedContent);
+                  return {
+                    ...msg,
+                    content: updatedContent,
+                    isStreaming: true,
+                    formattingMetadata: {
+                      hasHeaders: updatedFeatures.hasHeaders,
+                      hasLists: updatedFeatures.hasLists,
+                      hasTables: updatedFeatures.hasTables,
+                      hasLinks: updatedFeatures.hasLinks,
+                      hasBlockquotes: updatedFeatures.hasBlockquotes,
+                      estimatedReadTime: updatedFeatures.estimatedReadTime,
+                    },
+                  };
+                }
+                return msg;
+              })
+            );
+          },
+          // onComplete - finalize the response
+          (data: unknown) => {
+            console.log("Enhanced chat stream completed:", data);
+            setMessages((prev) =>
+              prev.map((msg) => {
+                if (msg.id === aiMessageId) {
+                  const finalFeatures = analyzeMarkdownFeatures(msg.content);
+                  return {
+                    ...msg,
+                    isStreaming: false,
+                    formattingMetadata: {
+                      hasHeaders: finalFeatures.hasHeaders,
+                      hasLists: finalFeatures.hasLists,
+                      hasTables: finalFeatures.hasTables,
+                      hasLinks: finalFeatures.hasLinks,
+                      hasBlockquotes: finalFeatures.hasBlockquotes,
+                      estimatedReadTime: finalFeatures.estimatedReadTime,
+                    },
+                  };
+                }
+                return msg;
+              })
+            );
+            setIsLoading(false);
+          },
+          // onError - handle errors with better user experience
+          (error: string) => {
+            console.error("Enhanced chat stream error:", error);
+
+            // Create a more user-friendly error message
+            let friendlyError = "";
+            if (error.includes("NoneType") || error.includes("subscriptable")) {
+              friendlyError =
+                "Sorry, there was an error processing the data 😅 Let me try to answer your question with my available knowledge instead! 💫\n\n";
+
+              // Try to provide a helpful response based on the query
+              const query = messageContent.toLowerCase();
+              if (
+                query.includes("trending") ||
+                query.includes("news") ||
+                query.includes("latest")
+              ) {
+                friendlyError +=
+                  "For the latest information and news, I recommend:\n\n";
+                friendlyError +=
+                  "📰 **Tech News**: TechCrunch, The Verge, Wired\n";
+                friendlyError +=
+                  "🤖 **AI Development**: OpenAI Blog, Google AI Blog, Anthropic\n";
+                friendlyError +=
+                  "🌐 **Trending Topics**: Twitter Trends, Reddit Popular, Google Trends\n\n";
+                friendlyError +=
+                  'Or try asking more specific questions like "Explain the latest AI technology" instead! 😊';
+              } else if (
+                query.includes("crypto") ||
+                query.includes("bitcoin")
+              ) {
+                friendlyError += "For Cryptocurrency information:\n\n";
+                friendlyError +=
+                  "💰 **Current Bitcoin Price**: Around $43,000-$45,000 USD\n";
+                friendlyError +=
+                  "📈 **Trend**: Crypto market is highly volatile\n";
+                friendlyError +=
+                  "🔍 **Data Sources**: CoinGecko, CoinMarketCap, Binance\n\n";
+                friendlyError +=
+                  'Try asking more specific questions like "Explain blockchain technology"! 😊';
+              } else {
+                friendlyError +=
+                  "Try asking a new question or changing the format of your question. I'm ready to help you! 🚀";
+              }
             } else {
-              friendlyError +=
-                "Try asking a new question or changing the format of your question. I'm ready to help you! 🚀";
+              friendlyError = `Sorry, an error occurred: ${error}\n\nTry asking a new question or refresh the page 😊`;
             }
-          } else {
-            friendlyError = `Sorry, an error occurred: ${error}\n\nTry asking a new question or refresh the page 😊`;
+
+            setMessages((prev) =>
+              prev.map((msg) => {
+                if (msg.id === aiMessageId) {
+                  const errorFeatures = analyzeMarkdownFeatures(friendlyError);
+                  return {
+                    ...msg,
+                    content: friendlyError,
+                    isStreaming: false,
+                    formattingMetadata: {
+                      hasHeaders: errorFeatures.hasHeaders,
+                      hasLists: errorFeatures.hasLists,
+                      hasTables: errorFeatures.hasTables,
+                      hasLinks: errorFeatures.hasLinks,
+                      hasBlockquotes: errorFeatures.hasBlockquotes,
+                      estimatedReadTime: errorFeatures.estimatedReadTime,
+                    },
+                  };
+                }
+                return msg;
+              })
+            );
+            setIsLoading(false);
           }
+        );
+      } catch (error) {
+        console.error("Failed to send message to enhanced backend:", error);
 
-          setMessages((prev) =>
-            prev.map((msg) => {
-              if (msg.id === aiMessageId) {
-                const errorFeatures = analyzeMarkdownFeatures(friendlyError);
-                return {
-                  ...msg,
-                  content: friendlyError,
-                  isStreaming: false,
-                  formattingMetadata: {
-                    hasHeaders: errorFeatures.hasHeaders,
-                    hasLists: errorFeatures.hasLists,
-                    hasTables: errorFeatures.hasTables,
-                    hasLinks: errorFeatures.hasLinks,
-                    hasBlockquotes: errorFeatures.hasBlockquotes,
-                    estimatedReadTime: errorFeatures.estimatedReadTime,
-                  },
-                };
-              }
-              return msg;
-            })
-          );
-          setIsLoading(false);
-        }
-      );
-    } catch (error) {
-      console.error("Failed to send message to enhanced backend:", error);
-
-      // Enhanced fallback response with more context
-      const fallbackContent = `I received your message: "${messageContent}". 
+        // Enhanced fallback response with more context
+        const fallbackContent = `I received your message: "${messageContent}". 
 
 The enhanced backend appears to be unavailable. Here's what I would do with full backend integration:
 
 🤖 **AI Model**: Process through ${selectedModel} (${
-        availableModels.find((m) => m.id === selectedModel)?.name ||
-        "Selected Model"
-      })
+          availableModels.find((m) => m.id === selectedModel)?.name ||
+          "Selected Model"
+        })
 🔍 **Search Tools**: ${
-        selectedTool
-          ? `Use ${selectedTool} for real-time data`
-          : "Intelligent context detection for web search, crypto data, or news"
-      }
+          selectedTool
+            ? `Use ${selectedTool} for real-time data`
+            : "Intelligent context detection for web search, crypto data, or news"
+        }
 ⚡ **Enhanced Features**: Real-time streaming, conversation history, vector search, and intelligent fallback handling
 
 Please ensure the enhanced backend service is running on http://localhost:8000 and properly configured with API keys for:
@@ -384,30 +404,39 @@ Please ensure the enhanced backend service is running on http://localhost:8000 a
 - Binance API (for crypto data)
 - PostgreSQL with pgvector (for knowledge search)`;
 
-      setMessages((prev) =>
-        prev.map((msg) => {
-          if (msg.id === aiMessageId) {
-            const fallbackFeatures = analyzeMarkdownFeatures(fallbackContent);
-            return {
-              ...msg,
-              content: fallbackContent,
-              isStreaming: false,
-              formattingMetadata: {
-                hasHeaders: fallbackFeatures.hasHeaders,
-                hasLists: fallbackFeatures.hasLists,
-                hasTables: fallbackFeatures.hasTables,
-                hasLinks: fallbackFeatures.hasLinks,
-                hasBlockquotes: fallbackFeatures.hasBlockquotes,
-                estimatedReadTime: fallbackFeatures.estimatedReadTime,
-              },
-            };
-          }
-          return msg;
-        })
-      );
-      setIsLoading(false);
-    }
-  };
+        setMessages((prev) =>
+          prev.map((msg) => {
+            if (msg.id === aiMessageId) {
+              const fallbackFeatures = analyzeMarkdownFeatures(fallbackContent);
+              return {
+                ...msg,
+                content: fallbackContent,
+                isStreaming: false,
+                formattingMetadata: {
+                  hasHeaders: fallbackFeatures.hasHeaders,
+                  hasLists: fallbackFeatures.hasLists,
+                  hasTables: fallbackFeatures.hasTables,
+                  hasLinks: fallbackFeatures.hasLinks,
+                  hasBlockquotes: fallbackFeatures.hasBlockquotes,
+                  estimatedReadTime: fallbackFeatures.estimatedReadTime,
+                },
+              };
+            }
+            return msg;
+          })
+        );
+        setIsLoading(false);
+      }
+    },
+    [
+      inputText,
+      isLoading,
+      selectedModel,
+      availableModels,
+      selectedTool,
+      generateMessageId,
+    ]
+  );
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     // Check for Cmd+Enter (Mac) or Ctrl+Enter (Windows/Linux) for voice input
@@ -457,32 +486,37 @@ Please ensure the enhanced backend service is running on http://localhost:8000 a
     }
   };
 
-  const handlePromptClick = (prompt: string) => {
-    const now = Date.now();
-    const timeDiff = now - lastClickTime;
+  const handlePromptClick = useCallback(
+    (prompt: string) => {
+      if (!isHydrated) return;
 
-    // If the same prompt was clicked within 300ms, treat it as a double-click
-    if (prompt === lastClickedPrompt && timeDiff < 300) {
-      // Double-click detected - submit the prompt directly
-      setInputText(prompt);
-      // Use setTimeout to ensure state is updated before submitting
-      setTimeout(() => {
-        // Directly call the submit handler with a minimal mock event
-        handleSubmit({ preventDefault: () => {} } as React.FormEvent);
-      }, 0);
-      // Reset click tracking
-      setLastClickTime(0);
-      setLastClickedPrompt("");
-    } else {
-      // Single click - populate input field
-      setInputText(prompt);
-      // Auto-focus the input field
-      inputRef.current?.focus();
-      // Update click tracking
-      setLastClickTime(now);
-      setLastClickedPrompt(prompt);
-    }
-  };
+      const now = Date.now();
+      const timeDiff = now - lastClickTime;
+
+      // If the same prompt was clicked within 300ms, treat it as a double-click
+      if (prompt === lastClickedPrompt && timeDiff < 300) {
+        // Double-click detected - submit the prompt directly
+        setInputText(prompt);
+        // Use setTimeout to ensure state is updated before submitting
+        setTimeout(() => {
+          // Directly call the submit handler with a minimal mock event
+          handleSubmit({ preventDefault: () => {} } as React.FormEvent);
+        }, 0);
+        // Reset click tracking
+        setLastClickTime(0);
+        setLastClickedPrompt("");
+      } else {
+        // Single click - populate input field
+        setInputText(prompt);
+        // Auto-focus the input field
+        inputRef.current?.focus();
+        // Update click tracking
+        setLastClickTime(now);
+        setLastClickedPrompt(prompt);
+      }
+    },
+    [isHydrated, lastClickTime, lastClickedPrompt, handleSubmit]
+  );
 
   // Auto-focus the input field when the component mounts
   useEffect(() => {
@@ -926,6 +960,20 @@ Please ensure the enhanced backend service is running on http://localhost:8000 a
     }
   }, [attachToElement]);
 
+  // Prevent hydration mismatch by showing loading state until hydrated
+  if (!isHydrated) {
+    return (
+      <div className="flex h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-1000 dark:via-gray-950 dark:to-gray-900 text-gray-900 dark:text-gray-50 transition-all duration-500">
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 dark:border-gray-100 mx-auto mb-4"></div>
+            <p className="text-gray-600 dark:text-gray-400">Loading...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       ref={mainContainerRef}
@@ -1351,6 +1399,7 @@ Please ensure the enhanced backend service is running on http://localhost:8000 a
                 <AnimatedThemeToggler
                   isDarkMode={isDarkMode}
                   toggleDarkMode={toggleDarkMode}
+                  isUsingSystemPreference={isUsingSystemPreference}
                   className="p-2 rounded-xl bg-white/80 dark:bg-gray-800/80 backdrop-blur-md border border-gray-200/40 dark:border-gray-700/40 hover:bg-white/90 dark:hover:bg-gray-700/90 transition-all duration-200 shadow hover:shadow-md flex items-center justify-center"
                 />
               </div>
@@ -1559,6 +1608,7 @@ Please ensure the enhanced backend service is running on http://localhost:8000 a
                         className="w-full resize-none bg-transparent px-14 py-3 pr-14 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none text-sm leading-relaxed font-medium"
                         rows={1}
                         style={{ minHeight: "40px", maxHeight: "120px" }}
+                        suppressHydrationWarning
                       />
 
                       {/* Voice input and Send buttons - moved inside the input container on the right side */}
