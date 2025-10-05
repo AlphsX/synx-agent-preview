@@ -7,7 +7,6 @@ import {
   TrendingUp,
   User,
   Mic,
-  Plus,
   ChevronLeft,
   ChevronRight,
   Zap,
@@ -32,6 +31,29 @@ const LogoIcon = ({ className }: { className?: string }) => (
       d="M10.9503 23.0313C7.07343 19.3235 7.74185 13.5853 11.0498 10.2763C13.4959 7.82722 17.5036 6.82767 21.0021 8.2971L24.7595 6.55998C24.0826 6.07017 23.215 5.54334 22.2195 5.17313C17.7198 3.31926 12.3326 4.24192 8.67479 7.90126C5.15635 11.4239 4.0499 16.8403 5.94992 21.4622C7.36924 24.9165 5.04257 27.3598 2.69884 29.826C1.86829 30.7002 1.0349 31.5745 0.36364 32.5L10.9474 23.0341"
       fill="currentColor"
       id="mark"
+    />
+  </svg>
+);
+
+// Custom New Chat Icon Component
+const NewChatIcon = ({ className }: { className?: string }) => (
+  <svg 
+    width="18" 
+    height="18" 
+    viewBox="0 0 24 24" 
+    fill="none" 
+    xmlns="http://www.w3.org/2000/svg" 
+    className={`stroke-[2] ${className}`}
+  >
+    <path 
+      d="M10 4V4C8.13623 4 7.20435 4 6.46927 4.30448C5.48915 4.71046 4.71046 5.48915 4.30448 6.46927C4 7.20435 4 8.13623 4 10V13.6C4 15.8402 4 16.9603 4.43597 17.816C4.81947 18.5686 5.43139 19.1805 6.18404 19.564C7.03968 20 8.15979 20 10.4 20H14C15.8638 20 16.7956 20 17.5307 19.6955C18.5108 19.2895 19.2895 18.5108 19.6955 17.5307C20 16.7956 20 15.8638 20 14V14" 
+      stroke="currentColor" 
+      strokeLinecap="square"
+    />
+    <path 
+      d="M12.4393 14.5607L19.5 7.5C20.3284 6.67157 20.3284 5.32843 19.5 4.5C18.6716 3.67157 17.3284 3.67157 16.5 4.5L9.43934 11.5607C9.15804 11.842 9 12.2235 9 12.6213V15H11.3787C11.7765 15 12.158 14.842 12.4393 14.5607Z" 
+      stroke="currentColor" 
+      strokeLinecap="square"
     />
   </svg>
 );
@@ -964,7 +986,7 @@ Please ensure the enhanced backend service is running on http://localhost:8000 a
                 setInputText(""); // Clear input field
               }}
             >
-              <Plus className="h-5 w-5 flex-shrink-0" />
+              <NewChatIcon className="h-5 w-5 flex-shrink-0" />
               <span>New Chat</span>
             </button>
           </div>
@@ -1124,7 +1146,7 @@ Please ensure the enhanced backend service is running on http://localhost:8000 a
               }}
               data-sidebar-element="new-chat-button"
             >
-              <Plus className="h-5 w-5 mx-auto" />
+              <NewChatIcon className="h-5 w-5 mx-auto" />
             </button>
           ) : (
             <button
@@ -1138,7 +1160,7 @@ Please ensure the enhanced backend service is running on http://localhost:8000 a
               }}
               data-sidebar-element="new-chat-button"
             >
-              <Plus className="h-5 w-5 flex-shrink-0" />
+              <NewChatIcon className="h-5 w-5 flex-shrink-0" />
               <span className="font-semibold">New Chat</span>
             </button>
           )}
