@@ -11,6 +11,9 @@ export { useDynamicFavicon } from './useDynamicFavicon';
 // Export idle detection hook
 export { useIdleDetection } from './useIdleDetection';
 
+// Export keyboard shortcuts hook
+export { useKeyboardShortcuts } from './useKeyboardShortcuts';
+
 // Export swipe gesture hook
 export { useSwipeGesture } from './useSwipeGesture';
 

@@ -57,7 +57,7 @@ const NewChatIcon = ({ className }: { className?: string }) => (
     />
   </svg>
 );
-import { useDarkMode, useSwipeGesture, useDynamicFavicon } from "@/hooks";
+import { useDarkMode, useSwipeGesture, useDynamicFavicon, useKeyboardShortcuts } from "@/hooks";
 import {
   AnimatedThemeToggler,
   VoiceThemeNotification,
@@ -147,6 +147,32 @@ export default function Home() {
   
   // Dynamic favicon based on theme
   useDynamicFavicon(isDarkMode);
+
+  // Keyboard shortcuts
+  const toggleSidebar = useCallback(() => {
+    // Toggle both mobile and desktop sidebar states
+    setIsSidebarOpen(prev => !prev);
+    setIsDesktopSidebarCollapsed(prev => !prev);
+  }, []);
+
+  const focusInput = useCallback(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  const newChat = useCallback(() => {
+    setMessages([]);
+    setInputText("");
+    setShowWelcome(true);
+    inputRef.current?.focus();
+  }, []);
+
+  useKeyboardShortcuts({
+    onToggleSidebar: toggleSidebar,
+    onToggleTheme: toggleDarkMode,
+    onFocusInput: focusInput,
+    onNewChat: newChat,
+  });
+
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
