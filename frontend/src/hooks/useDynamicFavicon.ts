@@ -1,12 +1,18 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { generateFaviconSvg } from '@/utils/generateFavicon';
 
 export function useDynamicFavicon(isDarkMode: boolean) {
+  const lastThemeRef = useRef<boolean | null>(null);
+
   useEffect(() => {
     // Only run on client side
     if (typeof window === 'undefined') return;
+
+    // Skip if theme hasn't actually changed
+    if (lastThemeRef.current === isDarkMode) return;
+    lastThemeRef.current = isDarkMode;
 
     // Find existing favicon link element by id first, then by rel
     let faviconLink = document.getElementById('favicon') as HTMLLinkElement;
@@ -32,17 +38,7 @@ export function useDynamicFavicon(isDarkMode: boolean) {
       faviconLink.type = 'image/svg+xml';
     }
     
-    // Only update if the href is different to avoid unnecessary updates
-    if (faviconLink.href !== faviconDataUri) {
-      faviconLink.href = faviconDataUri;
-    }
-
-    // OLD PNG-based implementation (commented out for reference)
-    // const faviconPath = isDarkMode ? '/icon-dark.png' : '/icon-light.png';
-    // const currentHref = faviconLink.href;
-    // const newHref = window.location.origin + faviconPath;
-    // if (currentHref !== newHref) {
-    //   faviconLink.href = faviconPath;
-    // }
+    // Force update the favicon
+    faviconLink.href = faviconDataUri;
   }, [isDarkMode]);
 }
