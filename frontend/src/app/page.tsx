@@ -166,13 +166,6 @@ export default function Home() {
     inputRef.current?.focus();
   }, []);
 
-  useKeyboardShortcuts({
-    onToggleSidebar: toggleSidebar,
-    onToggleTheme: toggleDarkMode,
-    onFocusInput: focusInput,
-    onNewChat: newChat,
-  });
-
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -212,6 +205,24 @@ export default function Home() {
     if (!isHydrated) return `temp-${Math.random()}`;
     return `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   }, [isHydrated]);
+
+  const toggleTools = useCallback(() => {
+    // Only trigger if input is empty
+    if (!inputText.trim()) {
+      const plusButton = document.querySelector('[data-plus-button]') as HTMLButtonElement;
+      if (plusButton) {
+        plusButton.click();
+      }
+    }
+  }, [inputText]);
+
+  useKeyboardShortcuts({
+    onToggleSidebar: toggleSidebar,
+    onToggleTheme: toggleDarkMode,
+    onFocusInput: focusInput,
+    onNewChat: newChat,
+    onToggleTools: toggleTools,
+  });
 
   useEffect(() => {
     scrollToBottom();

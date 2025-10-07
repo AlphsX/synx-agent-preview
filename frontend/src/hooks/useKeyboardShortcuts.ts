@@ -1,12 +1,13 @@
-'use client';
+"use client";
 
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback } from "react";
 
 interface KeyboardShortcutsConfig {
   onToggleSidebar?: () => void;
   onToggleTheme?: () => void;
   onFocusInput?: () => void;
   onNewChat?: () => void;
+  onToggleTools?: () => void;
 }
 
 export function useKeyboardShortcuts(config: KeyboardShortcutsConfig) {
@@ -14,69 +15,93 @@ export function useKeyboardShortcuts(config: KeyboardShortcutsConfig) {
     onToggleSidebar,
     onToggleTheme,
     onFocusInput,
-    onNewChat
+    onNewChat,
+    onToggleTools,
   } = config;
 
-  const handleKeyDown = useCallback((event: KeyboardEvent) => {
-    // Check for modifier keys (Cmd on Mac, Ctrl on Windows/Linux)
-    const isModifierPressed = event.metaKey || event.ctrlKey;
-    
-    if (!isModifierPressed) return;
+  const handleKeyDown = useCallback(
+    (event: KeyboardEvent) => {
+      // Check for modifier keys (Cmd on Mac, Ctrl on Windows/Linux)
+      const isModifierPressed = event.metaKey || event.ctrlKey;
 
-    // Prevent default behavior for our shortcuts
-    switch (event.key) {
-      case '[':
-        // Cmd+[ or Ctrl+[ - Toggle sidebar
-        if (onToggleSidebar) {
-          event.preventDefault();
-          onToggleSidebar();
-        }
-        break;
+      // Handle "/" key for tools toggle (without modifier)
+      if (event.key === "/" && !isModifierPressed && onToggleTools) {
+        // Check if the active element is an input, textarea, or contenteditable
+        const activeElement = document.activeElement;
+        const isInputFocused = activeElement && (
+          activeElement.tagName === 'INPUT' ||
+          activeElement.tagName === 'TEXTAREA' ||
+          activeElement.getAttribute('contenteditable') === 'true'
+        );
         
-      case 'd':
-        // Cmd+D or Ctrl+D - Toggle dark mode
-        if (onToggleTheme) {
+        // Only trigger tools toggle if no input is focused
+        if (!isInputFocused) {
           event.preventDefault();
-          onToggleTheme();
+          onToggleTools();
+          return;
         }
-        break;
-        
-      case 'k':
-        // Cmd+K or Ctrl+K - Focus input (common shortcut)
-        if (onFocusInput) {
-          event.preventDefault();
-          onFocusInput();
-        }
-        break;
-        
-      case 'n':
-        // Cmd+N or Ctrl+N - New chat
-        if (onNewChat) {
-          event.preventDefault();
-          onNewChat();
-        }
-        break;
-    }
-  }, [onToggleSidebar, onToggleTheme, onFocusInput, onNewChat]);
+        // If input is focused, let the "/" character be typed normally
+      }
+
+      if (!isModifierPressed) return;
+
+      // Prevent default behavior for our shortcuts
+      switch (event.key) {
+        case "[":
+          // Cmd+[ or Ctrl+[ - Toggle sidebar
+          if (onToggleSidebar) {
+            event.preventDefault();
+            onToggleSidebar();
+          }
+          break;
+
+        case "d":
+          // Cmd+D or Ctrl+D - Toggle dark mode
+          if (onToggleTheme) {
+            event.preventDefault();
+            onToggleTheme();
+          }
+          break;
+
+        case "k":
+          // Cmd+K or Ctrl+K - Focus input (common shortcut)
+          if (onFocusInput) {
+            event.preventDefault();
+            onFocusInput();
+          }
+          break;
+
+        case "n":
+          // Cmd+N or Ctrl+N - New chat
+          if (onNewChat) {
+            event.preventDefault();
+            onNewChat();
+          }
+          break;
+      }
+    },
+    [onToggleSidebar, onToggleTheme, onFocusInput, onNewChat, onToggleTools]
+  );
 
   useEffect(() => {
     // Add event listener for keydown events
-    document.addEventListener('keydown', handleKeyDown);
-    
+    document.addEventListener("keydown", handleKeyDown);
+
     // Cleanup function to remove event listener
     return () => {
-      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener("keydown", handleKeyDown);
     };
   }, [handleKeyDown]);
 
   // Return helper function to check if shortcuts are supported
   return {
-    isSupported: typeof window !== 'undefined',
+    isSupported: typeof window !== "undefined",
     shortcuts: {
-      toggleSidebar: navigator.platform.includes('Mac') ? 'Cmd+[' : 'Ctrl+[',
-      toggleTheme: navigator.platform.includes('Mac') ? 'Cmd+D' : 'Ctrl+D',
-      focusInput: navigator.platform.includes('Mac') ? 'Cmd+K' : 'Ctrl+K',
-      newChat: navigator.platform.includes('Mac') ? 'Cmd+N' : 'Ctrl+N',
-    }
+      toggleSidebar: navigator.platform.includes("Mac") ? "Cmd+[" : "Ctrl+[",
+      toggleTheme: navigator.platform.includes("Mac") ? "Cmd+D" : "Ctrl+D",
+      focusInput: navigator.platform.includes("Mac") ? "Cmd+K" : "Ctrl+K",
+      newChat: navigator.platform.includes("Mac") ? "Cmd+N" : "Ctrl+N",
+      toggleTools: "/",
+    },
   };
 }

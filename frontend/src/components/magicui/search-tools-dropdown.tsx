@@ -252,6 +252,7 @@ export const SearchToolsDropdown = ({ onToolSelect, selectedTool, isDarkMode, cl
           color: getButtonColor()
         }}
         disabled={isLoading}
+        data-plus-button
       >
         {isLoading ? (
           <Loader2 className="h-5 w-5 animate-spin" />
