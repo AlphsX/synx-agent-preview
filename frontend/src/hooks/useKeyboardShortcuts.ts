@@ -34,13 +34,28 @@ export function useKeyboardShortcuts(config: KeyboardShortcutsConfig) {
           activeElement.getAttribute('contenteditable') === 'true'
         );
         
-        // Only trigger tools toggle if no input is focused
-        if (!isInputFocused) {
+        if (isInputFocused) {
+          // Check if this is the first character in the input
+          const inputElement = activeElement as HTMLInputElement | HTMLTextAreaElement;
+          const currentValue = inputElement.value || '';
+          const cursorPosition = inputElement.selectionStart || 0;
+          
+          // If input is empty or cursor is at the beginning and input is empty
+          if (currentValue.length === 0 || (cursorPosition === 0 && currentValue.trim().length === 0)) {
+            // Don't prevent default - let "/" be typed in input
+            // Use setTimeout to trigger tools after the character is typed
+            setTimeout(() => {
+              onToggleTools();
+            }, 0);
+            return;
+          }
+          // Otherwise, let the "/" character be typed normally
+        } else {
+          // If no input is focused, trigger tools toggle
           event.preventDefault();
           onToggleTools();
           return;
         }
-        // If input is focused, let the "/" character be typed normally
       }
 
       if (!isModifierPressed) return;
@@ -97,10 +112,10 @@ export function useKeyboardShortcuts(config: KeyboardShortcutsConfig) {
   return {
     isSupported: typeof window !== "undefined",
     shortcuts: {
-      toggleSidebar: navigator.platform.includes("Mac") ? "Cmd+[" : "Ctrl+[",
-      toggleTheme: navigator.platform.includes("Mac") ? "Cmd+D" : "Ctrl+D",
-      focusInput: navigator.platform.includes("Mac") ? "Cmd+K" : "Ctrl+K",
-      newChat: navigator.platform.includes("Mac") ? "Cmd+N" : "Ctrl+N",
+      toggleSidebar: navigator.userAgent.includes("Mac") ? "Cmd+[" : "Ctrl+[",
+      toggleTheme: navigator.userAgent.includes("Mac") ? "Cmd+D" : "Ctrl+D",
+      focusInput: navigator.userAgent.includes("Mac") ? "Cmd+K" : "Ctrl+K",
+      newChat: navigator.userAgent.includes("Mac") ? "Cmd+N" : "Ctrl+N",
       toggleTools: "/",
     },
   };

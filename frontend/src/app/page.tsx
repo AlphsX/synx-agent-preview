@@ -260,7 +260,28 @@ export default function Home() {
       };
 
       setMessages((prev) => [...prev, userMessage]);
-      const messageContent = inputText;
+      
+      // Prepare message content with tool context if a tool is selected
+      let messageContent = inputText;
+      if (selectedTool) {
+        switch (selectedTool) {
+          case "web_search":
+            messageContent = `[TOOL: Web Search] ${inputText}`;
+            break;
+          case "news_search":
+            messageContent = `[TOOL: News Search] ${inputText}`;
+            break;
+          case "crypto_data":
+            messageContent = `[TOOL: Cryptocurrency Data] ${inputText}`;
+            break;
+          case "vector_search":
+            messageContent = `[TOOL: Knowledge Search] ${inputText}`;
+            break;
+        }
+        // Clear selected tool after use
+        setSelectedTool(null);
+      }
+      
       setInputText("");
       setIsLoading(true);
 
@@ -504,23 +525,15 @@ Please ensure the enhanced backend service is running on http://localhost:8000 a
   }, []);
 
   const handleToolSelect = (toolId: string) => {
-    if (toolId === "web_search") {
-      setInputText("Search the web for latest information about ");
-      setSelectedTool("web_search");
-      inputRef.current?.focus();
-    } else if (toolId === "news_search") {
-      setInputText("Search for latest news about ");
-      setSelectedTool("news_search");
-      inputRef.current?.focus();
-    } else if (toolId === "crypto_data") {
-      setInputText("Get current cryptocurrency market data for ");
-      setSelectedTool("crypto_data");
-      inputRef.current?.focus();
-    } else if (toolId === "vector_search") {
-      setInputText("Search knowledge base for ");
-      setSelectedTool("vector_search");
-      inputRef.current?.focus();
+    // Set the selected tool
+    setSelectedTool(toolId);
+    
+    // Remove the "/" from input if it's the only character
+    if (inputText === "/") {
+      setInputText("");
     }
+    
+    inputRef.current?.focus();
   };
 
   const handlePromptClick = useCallback(
@@ -1641,7 +1654,15 @@ Please ensure the enhanced backend service is running on http://localhost:8000 a
                         value={inputText}
                         onChange={(e) => setInputText(e.target.value)}
                         onKeyDown={handleKeyDown}
-                        placeholder="Ask me anything..."
+                        placeholder={
+                          selectedTool 
+                            ? `${selectedTool === 'web_search' ? 'Web Search' : 
+                                selectedTool === 'news_search' ? 'News Search' : 
+                                selectedTool === 'crypto_data' ? 'Crypto Data' : 
+                                selectedTool === 'vector_search' ? 'Knowledge Search' : 
+                                'Ask me anything...'} - Type your query...`
+                            : "Ask me anything..."
+                        }
                         className="w-full resize-none bg-transparent px-14 py-3 pr-14 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none text-sm leading-relaxed font-medium"
                         rows={1}
                         style={{ minHeight: "40px", maxHeight: "120px" }}
