@@ -22,6 +22,7 @@ type Props = {
   selectedTool: string | null;
   isDarkMode: boolean;
   className?: string;
+  onDropdownStateChange?: (isOpen: boolean) => void;
 };
 
 const getIconForTool = (toolId: string) => {
@@ -74,7 +75,7 @@ const getColorForTool = (toolId: string) => {
   }
 };
 
-export const SearchToolsDropdown = ({ onToolSelect, selectedTool, isDarkMode, className = "" }: Props) => {
+export const SearchToolsDropdown = ({ onToolSelect, selectedTool, isDarkMode, className = "", onDropdownStateChange }: Props) => {
   const [isOpen, setIsOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState<number>(-1);
   const [searchTools, setSearchTools] = useState<SearchTool[]>([]);
@@ -94,7 +95,7 @@ export const SearchToolsDropdown = ({ onToolSelect, selectedTool, isDarkMode, cl
         const fetchedTools = response.tools || [];
         
         // Transform backend tools to frontend format
-        const transformedTools: SearchTool[] = fetchedTools.map(tool => {
+        const transformedTools: SearchTool[] = fetchedTools.map((tool: any) => {
           const colors = getColorForTool(tool.id);
           return {
             id: tool.id,
@@ -228,6 +229,11 @@ export const SearchToolsDropdown = ({ onToolSelect, selectedTool, isDarkMode, cl
       setHighlightedIndex(-1); // Reset highlight when closed
     }
   }, [isOpen]);
+
+  // Notify parent component about dropdown state changes
+  useEffect(() => {
+    onDropdownStateChange?.(isOpen);
+  }, [isOpen, onDropdownStateChange]);
   
   // Calculate the button color based on selected tool
   const getButtonColor = () => {

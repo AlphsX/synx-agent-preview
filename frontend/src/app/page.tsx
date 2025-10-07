@@ -57,7 +57,12 @@ const NewChatIcon = ({ className }: { className?: string }) => (
     />
   </svg>
 );
-import { useDarkMode, useSwipeGesture, useDynamicFavicon, useKeyboardShortcuts } from "@/hooks";
+import {
+  useDarkMode,
+  useSwipeGesture,
+  useDynamicFavicon,
+  useKeyboardShortcuts,
+} from "@/hooks";
 import {
   AnimatedThemeToggler,
   VoiceThemeNotification,
@@ -144,15 +149,15 @@ interface AIModel {
 
 export default function Home() {
   const { isDarkMode, toggleDarkMode, isUsingSystemPreference } = useDarkMode();
-  
+
   // Dynamic favicon based on theme
   useDynamicFavicon(isDarkMode);
 
   // Keyboard shortcuts
   const toggleSidebar = useCallback(() => {
     // Toggle both mobile and desktop sidebar states
-    setIsSidebarOpen(prev => !prev);
-    setIsDesktopSidebarCollapsed(prev => !prev);
+    setIsSidebarOpen((prev) => !prev);
+    setIsDesktopSidebarCollapsed((prev) => !prev);
   }, []);
 
   const focusInput = useCallback(() => {
@@ -179,6 +184,7 @@ export default function Home() {
   const [lastClickTime, setLastClickTime] = useState<number>(0);
   const [lastClickedPrompt, setLastClickedPrompt] = useState<string>("");
   const [isHydrated, setIsHydrated] = useState(false);
+  const [isToolsDropdownOpen, setIsToolsDropdownOpen] = useState(false);
 
   // Voice recognition state variables
   const [isListening, setIsListening] = useState(false);
@@ -207,9 +213,11 @@ export default function Home() {
   }, [isHydrated]);
 
   const toggleTools = useCallback(() => {
-    // Only trigger if input is empty
-    if (!inputText.trim()) {
-      const plusButton = document.querySelector('[data-plus-button]') as HTMLButtonElement;
+    // Trigger if input is empty or contains only "/"
+    if (!inputText.trim() || inputText.trim() === "/") {
+      const plusButton = document.querySelector(
+        "[data-plus-button]"
+      ) as HTMLButtonElement;
       if (plusButton) {
         plusButton.click();
       }
@@ -260,7 +268,7 @@ export default function Home() {
       };
 
       setMessages((prev) => [...prev, userMessage]);
-      
+
       // Prepare message content with tool context if a tool is selected
       let messageContent = inputText;
       if (selectedTool) {
@@ -281,7 +289,7 @@ export default function Home() {
         // Clear selected tool after use
         setSelectedTool(null);
       }
-      
+
       setInputText("");
       setIsLoading(true);
 
@@ -504,6 +512,13 @@ Please ensure the enhanced backend service is running on http://localhost:8000 a
       return;
     }
 
+    // Check if tools dropdown is open - don't submit, let dropdown handle it
+    if (e.key === "Enter" && !e.shiftKey && isToolsDropdownOpen) {
+      e.preventDefault();
+      // Don't submit - the dropdown's keyboard handler will handle Enter
+      return;
+    }
+
     // Existing Enter key handling
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -527,12 +542,12 @@ Please ensure the enhanced backend service is running on http://localhost:8000 a
   const handleToolSelect = (toolId: string) => {
     // Set the selected tool
     setSelectedTool(toolId);
-    
+
     // Remove the "/" from input if it's the only character
     if (inputText === "/") {
       setInputText("");
     }
-    
+
     inputRef.current?.focus();
   };
 
@@ -1646,6 +1661,7 @@ Please ensure the enhanced backend service is running on http://localhost:8000 a
                           selectedTool={selectedTool}
                           isDarkMode={isDarkMode}
                           className=""
+                          onDropdownStateChange={setIsToolsDropdownOpen}
                         />
                       </div>
 
@@ -1655,12 +1671,18 @@ Please ensure the enhanced backend service is running on http://localhost:8000 a
                         onChange={(e) => setInputText(e.target.value)}
                         onKeyDown={handleKeyDown}
                         placeholder={
-                          selectedTool 
-                            ? `${selectedTool === 'web_search' ? 'Web Search' : 
-                                selectedTool === 'news_search' ? 'News Search' : 
-                                selectedTool === 'crypto_data' ? 'Crypto Data' : 
-                                selectedTool === 'vector_search' ? 'Knowledge Search' : 
-                                'Ask me anything...'} - Type your query...`
+                          selectedTool
+                            ? `${
+                                selectedTool === "web_search"
+                                  ? "Web Search"
+                                  : selectedTool === "news_search"
+                                  ? "News Search"
+                                  : selectedTool === "crypto_data"
+                                  ? "Crypto Data"
+                                  : selectedTool === "vector_search"
+                                  ? "Knowledge Search"
+                                  : "Ask me anything..."
+                              } - Type your query...`
                             : "Ask me anything..."
                         }
                         className="w-full resize-none bg-transparent px-14 py-3 pr-14 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none text-sm leading-relaxed font-medium"
