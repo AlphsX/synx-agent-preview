@@ -3,7 +3,13 @@
 import { useState, useEffect } from 'react';
 
 export function useDarkMode() {
-  const [isDarkMode, setIsDarkMode] = useState<boolean>(false); // Start with false to match SSR
+  // Get initial theme from document class (set by layout.tsx script)
+  const getInitialTheme = () => {
+    if (typeof window === 'undefined') return false;
+    return document.documentElement.classList.contains('dark');
+  };
+
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(getInitialTheme);
   const [systemPreference, setSystemPreference] = useState<boolean>(false);
   const [userPreference, setUserPreference] = useState<boolean | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
@@ -25,20 +31,22 @@ export function useDarkMode() {
     // Check localStorage for user preference
     const savedTheme = localStorage.getItem('theme');
     
-    if (savedTheme && savedTheme !== 'system') {
-      // User has manually set a preference
-      const savedValue = savedTheme === 'dark';
-      setIsDarkMode(savedValue);
-      setUserPreference(savedValue);
-    } else {
-      // Use system preference as default
-      setIsDarkMode(prefersDark);
-      setUserPreference(null);
-      // Ensure localStorage reflects system preference as default
-      if (!savedTheme) {
-        localStorage.setItem('theme', 'system');
-      }
+    // If no theme is set, default to system preference
+    if (!savedTheme) {
+      localStorage.setItem('theme', 'system');
     }
+    
+    // Set user preference based on saved theme
+    if (savedTheme === 'dark') {
+      setUserPreference(true);
+    } else if (savedTheme === 'light') {
+      setUserPreference(false);
+    } else {
+      setUserPreference(null); // system
+    }
+    
+    // Sync with document class (set by layout.tsx)
+    setIsDarkMode(document.documentElement.classList.contains('dark'));
     
     // Listen for system preference changes
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
@@ -48,28 +56,32 @@ export function useDarkMode() {
       const currentUserPref = localStorage.getItem('theme');
       if (!currentUserPref || currentUserPref === 'system') {
         setIsDarkMode(e.matches);
+        // Update document class
+        if (e.matches) {
+          document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.remove('dark');
+        }
       }
     };
+    
+    // Listen for document class changes (from other sources)
+    const observer = new MutationObserver(() => {
+      setIsDarkMode(document.documentElement.classList.contains('dark'));
+    });
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class']
+    });
     
     // Use addEventListener for better browser compatibility
     mediaQuery.addEventListener('change', handleChange);
     
     return () => {
       mediaQuery.removeEventListener('change', handleChange);
+      observer.disconnect();
     };
   }, []);
-
-  useEffect(() => {
-    // Only apply theme to document after hydration
-    if (!isHydrated || typeof window === 'undefined') return;
-    
-    // Apply theme to document
-    if (isDarkMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [isDarkMode, isHydrated]);
 
   const toggleDarkMode = () => {
     if (typeof window === 'undefined') return;
@@ -78,6 +90,13 @@ export function useDarkMode() {
     setIsDarkMode(newMode);
     setUserPreference(newMode);
     localStorage.setItem('theme', newMode ? 'dark' : 'light');
+    
+    // Update document class immediately
+    if (newMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
   };
 
   // Add a function to reset to system preference
@@ -87,6 +106,13 @@ export function useDarkMode() {
     localStorage.setItem('theme', 'system');
     setUserPreference(null);
     setIsDarkMode(systemPreference);
+    
+    // Update document class based on system preference
+    if (systemPreference) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
   };
 
   return { 

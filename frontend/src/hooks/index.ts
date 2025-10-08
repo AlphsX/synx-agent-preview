@@ -17,6 +17,9 @@ export { useKeyboardShortcuts } from './useKeyboardShortcuts';
 // Export swipe gesture hook
 export { useSwipeGesture } from './useSwipeGesture';
 
+// Export app loading hook
+export { useAppLoading } from './useAppLoading';
+
 // Hook for managing chat state
 export const useChat = () => {
   const [messages, setMessages] = useState<Message[]>([]);

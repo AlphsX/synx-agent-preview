@@ -75,6 +75,8 @@ import { StreamingRenderer } from "@/components/chat/StreamingRenderer";
 import { EnhancedMessage, FormattingMetadata } from "@/types/markdown";
 import { analyzeMarkdownFeatures } from "@/lib/markdown-utils";
 import { IdleMeteorAnimation } from "@/components/ui/idle-meteor-animation";
+import { LoadingScreen } from "@/components/ui/loading-screen";
+import { useAppLoading } from "@/hooks/useAppLoading";
 
 // Type definitions for SpeechRecognition API
 interface SpeechRecognitionEvent extends Event {
@@ -149,6 +151,7 @@ interface AIModel {
 
 export default function Home() {
   const { isDarkMode, toggleDarkMode, isUsingSystemPreference } = useDarkMode();
+  const { isLoading: appIsLoading } = useAppLoading();
 
   // Dynamic favicon based on theme
   useDynamicFavicon(isDarkMode);
@@ -1025,18 +1028,9 @@ Please ensure the enhanced backend service is running on http://localhost:8000 a
     }
   }, [attachToElement]);
 
-  // Prevent hydration mismatch by showing loading state until hydrated
-  if (!isHydrated) {
-    return (
-      <div className="flex h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-1000 dark:via-gray-950 dark:to-gray-900 text-gray-900 dark:text-gray-50 transition-all duration-500">
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 dark:border-gray-100 mx-auto mb-4"></div>
-            <p className="text-gray-600 dark:text-gray-400">Loading...</p>
-          </div>
-        </div>
-      </div>
-    );
+  // Show loading screen if app is still loading
+  if (appIsLoading) {
+    return <LoadingScreen isLoading={appIsLoading} />;
   }
 
   return (
