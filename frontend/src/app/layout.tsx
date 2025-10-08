@@ -36,21 +36,34 @@ export default function RootLayout({
                 try {
                   var theme = localStorage.getItem('theme');
                   var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                  var isMobile = window.innerWidth < 768;
                   
                   // If no theme is set, default to system preference
-                  if (!theme) {
+                  if (!theme || theme === 'null' || theme === 'undefined') {
                     localStorage.setItem('theme', 'system');
                     theme = 'system';
                   }
                   
                   var shouldBeDark = theme === 'dark' || (theme === 'system' && prefersDark);
                   
+                  // Clear any existing dark class first
+                  document.documentElement.classList.remove('dark');
+                  
                   if (shouldBeDark) {
                     document.documentElement.classList.add('dark');
-                  } else {
-                    document.documentElement.classList.remove('dark');
+                  }
+                  
+                  // Debug log for mobile
+                  if (isMobile) {
+                    console.log('Layout Script:', {
+                      theme: theme,
+                      prefersDark: prefersDark,
+                      shouldBeDark: shouldBeDark,
+                      documentHasDark: document.documentElement.classList.contains('dark')
+                    });
                   }
                 } catch (e) {
+                  console.error('Layout theme script error:', e);
                   // Fallback to system preference
                   if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
                     document.documentElement.classList.add('dark');

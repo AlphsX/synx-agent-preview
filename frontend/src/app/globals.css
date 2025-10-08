@@ -732,6 +732,35 @@ Swipe gesture animations */
     user-select: none;
     -webkit-touch-callout: none;
   }
+  
+  /* Ensure dark mode transitions work properly on mobile */
+  .dark {
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+  
+  /* Force hardware acceleration for smooth theme transitions */
+  body, html {
+    transform: translateZ(0);
+    backface-visibility: hidden;
+  }
+  
+  /* Prevent theme switching during touch interactions */
+  .swipe-container {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+    /* Isolate theme changes */
+    contain: style;
+  }
+  
+  /* Ensure theme toggle button works correctly on mobile */
+  button[aria-label*="theme"], button[aria-label*="Theme"] {
+    -webkit-tap-highlight-color: transparent;
+    tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
 }
 
 /* Sidebar swipe animations */

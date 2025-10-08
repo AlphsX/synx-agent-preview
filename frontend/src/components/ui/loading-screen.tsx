@@ -13,15 +13,39 @@ export function LoadingScreen({
 }: LoadingScreenProps) {
   const [progress, setProgress] = useState(0);
   const [isExiting, setIsExiting] = useState(false);
+  const [isHydrated, setIsHydrated] = useState(false);
+
+  // Handle hydration and mobile viewport
+  useEffect(() => {
+    setIsHydrated(true);
+
+    // Set up proper mobile viewport height
+    const setVH = () => {
+      const vh = window.innerHeight * 0.01;
+      document.documentElement.style.setProperty("--vh", `${vh}px`);
+    };
+
+    setVH();
+    window.addEventListener("resize", setVH);
+    window.addEventListener("orientationchange", setVH);
+
+    return () => {
+      window.removeEventListener("resize", setVH);
+      window.removeEventListener("orientationchange", setVH);
+    };
+  }, []);
 
   useEffect(() => {
-    if (!isLoading) return;
+    if (!isLoading || !isHydrated) return;
 
-    const startTime = Date.now();
+    let startTime: number;
     const duration = 800; // Match the useAppLoading duration
+    let animationId: number;
 
-    const updateProgress = () => {
-      const elapsed = Date.now() - startTime;
+    const updateProgress = (timestamp: number) => {
+      if (!startTime) startTime = timestamp;
+
+      const elapsed = timestamp - startTime;
       const rawProgress = (elapsed / duration) * 100;
 
       // Smooth easing curve (ease-out)
@@ -30,7 +54,7 @@ export function LoadingScreen({
       setProgress(Math.min(easedProgress, 100));
 
       if (rawProgress < 100) {
-        requestAnimationFrame(updateProgress);
+        animationId = requestAnimationFrame(updateProgress);
       } else {
         // Start exit animation
         setIsExiting(true);
@@ -38,14 +62,21 @@ export function LoadingScreen({
       }
     };
 
-    requestAnimationFrame(updateProgress);
-  }, [isLoading, onLoadingComplete]);
+    animationId = requestAnimationFrame(updateProgress);
 
-  if (!isLoading) return null;
+    return () => {
+      if (animationId) {
+        cancelAnimationFrame(animationId);
+      }
+    };
+  }, [isLoading, onLoadingComplete, isHydrated]);
+
+  // Don't render anything until hydrated to prevent hydration mismatch
+  if (!isHydrated || !isLoading) return null;
 
   return (
     <div
-      className={`fixed inset-0 z-50 flex items-center justify-center bg-white dark:bg-black transition-opacity duration-200 ${
+      className={`loading-container fixed inset-0 z-50 flex items-center justify-center bg-white dark:bg-black transition-opacity duration-200 ${
         isExiting ? "opacity-0" : "opacity-100"
       }`}
     >
@@ -61,6 +92,10 @@ export function LoadingScreen({
             className={`text-black dark:text-white transition-all duration-500 ${
               progress > 50 ? "scale-105" : "scale-100"
             }`}
+            style={{
+              // Prevent layout shift during animation
+              willChange: "transform",
+            }}
           >
             <path
               d="M13.2371 21.0407L24.3186 12.8506C24.8619 12.4491 25.6384 12.6057 25.8973 13.2294C27.2597 16.5185 26.651 20.4712 23.9403 23.1851C21.2297 25.8989 17.4581 26.4941 14.0108 25.1386L10.2449 26.8843C15.6463 30.5806 22.2053 29.6665 26.304 25.5601C29.5551 22.3051 30.562 17.8683 29.6205 13.8673L29.629 13.8758C28.2637 7.99809 29.9647 5.64871 33.449 0.844576C33.5314 0.730667 33.6139 0.616757 33.6964 0.5L29.1113 5.09055V5.07631L13.2343 21.0436"
@@ -94,18 +129,44 @@ export function LoadingScreen({
           className={`text-sm text-gray-600 dark:text-gray-400 transition-opacity duration-300 ${
             progress > 80 ? "opacity-50" : "opacity-100"
           }`}
-        >
-          
-        </div>
+        ></div>
       </div>
 
       <style jsx>{`
+        .loading-container {
+          min-height: 100vh;
+          min-height: 100dvh;
+          /* Ensure proper mobile viewport handling */
+          -webkit-overflow-scrolling: touch;
+          overscroll-behavior: none;
+        }
+
+        @supports (height: 100dvh) {
+          .loading-container {
+            min-height: 100dvh;
+          }
+        }
+
+        /* Prevent zoom on double tap for mobile */
+        .loading-container * {
+          touch-action: manipulation;
+        }
+
         @keyframes shimmer {
           0% {
             transform: translateX(-100%);
           }
           100% {
             transform: translateX(100%);
+          }
+        }
+
+        /* Optimize for mobile performance */
+        @media (max-width: 768px) {
+          .loading-container {
+            /* Use hardware acceleration */
+            transform: translateZ(0);
+            backface-visibility: hidden;
           }
         }
       `}</style>

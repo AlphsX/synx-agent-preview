@@ -3,13 +3,8 @@
 import { useState, useEffect } from 'react';
 
 export function useDarkMode() {
-  // Get initial theme from document class (set by layout.tsx script)
-  const getInitialTheme = () => {
-    if (typeof window === 'undefined') return false;
-    return document.documentElement.classList.contains('dark');
-  };
-
-  const [isDarkMode, setIsDarkMode] = useState<boolean>(getInitialTheme);
+  // Initialize with false to prevent hydration mismatch
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
   const [systemPreference, setSystemPreference] = useState<boolean>(false);
   const [userPreference, setUserPreference] = useState<boolean | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
@@ -24,29 +19,40 @@ export function useDarkMode() {
     // Only run client-side code after hydration
     if (typeof window === 'undefined') return;
     
-    // Get initial system preference
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    setSystemPreference(prefersDark);
-    
-    // Check localStorage for user preference
-    const savedTheme = localStorage.getItem('theme');
-    
-    // If no theme is set, default to system preference
-    if (!savedTheme) {
-      localStorage.setItem('theme', 'system');
-    }
-    
-    // Set user preference based on saved theme
-    if (savedTheme === 'dark') {
-      setUserPreference(true);
-    } else if (savedTheme === 'light') {
-      setUserPreference(false);
-    } else {
-      setUserPreference(null); // system
-    }
-    
-    // Sync with document class (set by layout.tsx)
-    setIsDarkMode(document.documentElement.classList.contains('dark'));
+    // Small delay to ensure layout.tsx script has run
+    setTimeout(() => {
+      // Get what the document class actually is (set by layout.tsx)
+      const actualDocumentDark = document.documentElement.classList.contains('dark');
+      
+      // Get system preference
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      setSystemPreference(prefersDark);
+      
+      // Get localStorage theme
+      const savedTheme = localStorage.getItem('theme');
+      
+      // Set user preference based on saved theme
+      if (savedTheme === 'dark') {
+        setUserPreference(true);
+      } else if (savedTheme === 'light') {
+        setUserPreference(false);
+      } else {
+        setUserPreference(null); // system
+      }
+      
+      // Simply sync our state with what the document actually is
+      setIsDarkMode(actualDocumentDark);
+      
+      // Debug log for mobile
+      if (window.innerWidth < 768) {
+        console.log('Mobile Theme Sync:', {
+          savedTheme,
+          prefersDark,
+          actualDocumentDark,
+          syncing: 'state to match document'
+        });
+      }
+    }, 50); // Small delay to ensure layout script runs first
     
     // Listen for system preference changes
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
@@ -65,21 +71,14 @@ export function useDarkMode() {
       }
     };
     
-    // Listen for document class changes (from other sources)
-    const observer = new MutationObserver(() => {
-      setIsDarkMode(document.documentElement.classList.contains('dark'));
-    });
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['class']
-    });
+    // Don't listen for document class changes to avoid conflicts with layout.tsx script
+    // The state should only be updated by this hook or system preference changes
     
     // Use addEventListener for better browser compatibility
     mediaQuery.addEventListener('change', handleChange);
     
     return () => {
       mediaQuery.removeEventListener('change', handleChange);
-      observer.disconnect();
     };
   }, []);
 
@@ -87,15 +86,27 @@ export function useDarkMode() {
     if (typeof window === 'undefined') return;
     
     const newMode = !isDarkMode;
-    setIsDarkMode(newMode);
-    setUserPreference(newMode);
+    
+    // Update localStorage first
     localStorage.setItem('theme', newMode ? 'dark' : 'light');
     
     // Update document class immediately
+    document.documentElement.classList.remove('dark');
     if (newMode) {
       document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
+    }
+    
+    // Update states
+    setIsDarkMode(newMode);
+    setUserPreference(newMode);
+    
+    // Debug log for mobile
+    if (window.innerWidth < 768) {
+      console.log('Theme Toggle:', {
+        newMode,
+        localStorage: localStorage.getItem('theme'),
+        documentHasDark: document.documentElement.classList.contains('dark')
+      });
     }
   };
 

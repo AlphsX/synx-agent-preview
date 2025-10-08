@@ -211,18 +211,23 @@ export default function Home() {
 
   // Generate stable IDs for messages to prevent hydration issues
   const generateMessageId = useCallback(() => {
-    if (!isHydrated) return `temp-${Math.random()}`;
+    if (!isHydrated) {
+      // Use a simple counter for server-side rendering to ensure consistency
+      return `temp-${messages.length}`;
+    }
     return `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  }, [isHydrated]);
+  }, [isHydrated, messages.length]);
 
   const toggleTools = useCallback(() => {
     // Trigger if input is empty or contains only "/"
     if (!inputText.trim() || inputText.trim() === "/") {
-      const plusButton = document.querySelector(
-        "[data-plus-button]"
-      ) as HTMLButtonElement;
-      if (plusButton) {
-        plusButton.click();
+      if (typeof document !== 'undefined') {
+        const plusButton = document.querySelector(
+          "[data-plus-button]"
+        ) as HTMLButtonElement;
+        if (plusButton) {
+          plusButton.click();
+        }
       }
     }
   }, [inputText]);
@@ -989,34 +994,29 @@ Please ensure the enhanced backend service is running on http://localhost:8000 a
     };
   }, [isListening, toggleVoiceRecognition]);
 
-  // Setup swipe gestures for mobile sidebar
+  // Setup swipe gestures for mobile sidebar with theme protection
   const { attachToElement } = useSwipeGesture({
     onSwipeRight: () => {
       // Open sidebar on swipe right (only on mobile)
-      if (window.innerWidth < 768) {
-        setIsSidebarOpen(true);
-        setVoiceThemeNotification({
-          isVisible: true,
-          message: "Sidebar opened",
-          theme: isDarkModeRef.current ? "dark" : "light",
-          type: "success",
-        });
+      if (typeof window !== 'undefined' && window.innerWidth < 768) {
+        // Use setTimeout to prevent any potential theme interference
+        setTimeout(() => {
+          setIsSidebarOpen(true);
+        }, 0);
       }
     },
     onSwipeLeft: () => {
       // Close sidebar on swipe left (only on mobile)
-      if (window.innerWidth < 768) {
-        setIsSidebarOpen(false);
-        setVoiceThemeNotification({
-          isVisible: true,
-          message: "Sidebar closed",
-          theme: isDarkModeRef.current ? "dark" : "light",
-          type: "success",
-        });
+      if (typeof window !== 'undefined' && window.innerWidth < 768) {
+        // Use setTimeout to prevent any potential theme interference
+        setTimeout(() => {
+          setIsSidebarOpen(false);
+        }, 0);
       }
     },
-    threshold: 80, // Minimum swipe distance
-    velocityThreshold: 0.4, // Minimum swipe velocity
+    threshold: 100, // Increased threshold to prevent accidental swipes
+    velocityThreshold: 0.5, // Increased velocity threshold
+    preventScroll: false, // Don't prevent scroll to avoid conflicts
   });
 
   // Attach swipe gesture to main container
@@ -1036,7 +1036,7 @@ Please ensure the enhanced backend service is running on http://localhost:8000 a
   return (
     <div
       ref={mainContainerRef}
-      className="flex h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-1000 dark:via-gray-950 dark:to-gray-900 text-gray-900 dark:text-gray-50 transition-all duration-500"
+      className="swipe-container flex h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-1000 dark:via-gray-950 dark:to-gray-900 text-gray-900 dark:text-gray-50 transition-all duration-500"
     >
       {/* Mobile Sidebar Overlay */}
       <div
@@ -1061,7 +1061,7 @@ Please ensure the enhanced backend service is running on http://localhost:8000 a
           }`}
         >
           {/* Mobile Sidebar Header */}
-          <div className="p-6 border-b border-gray-200/60 dark:border-gray-800/60">
+          <div className="p-6">
             <div className="flex items-center justify-start">
               <div className="relative">
                 <div
@@ -1147,7 +1147,7 @@ Please ensure the enhanced backend service is running on http://localhost:8000 a
           </div>
 
           {/* Mobile Sidebar Footer */}
-          <div className="p-4 border-t border-gray-200/60 dark:border-gray-800/60 mt-auto">
+          <div className="p-4 mt-auto">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
                 <div className="relative">
