@@ -666,6 +666,33 @@ body {
   user-select: none;
 }
 
+/* Prevent mobile input zoom */
+input, textarea, select {
+  font-size: 16px !important; /* Prevents zoom on iOS */
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+}
+
+/* Mobile-specific input styling */
+@media (max-width: 768px) {
+  input, textarea, select {
+    font-size: 16px !important; /* Critical for preventing iOS zoom */
+    transform: translateZ(0); /* Force hardware acceleration */
+    -webkit-transform: translateZ(0);
+  }
+  
+  /* Ensure chat input doesn't zoom */
+  .chat-input, 
+  textarea[placeholder*="Ask"], 
+  textarea[placeholder*="anything"] {
+    font-size: 16px !important;
+    -webkit-text-size-adjust: 100%;
+    -ms-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+}
+
 /* Ensure pointer events work correctly */
 .pointer-events-auto {
   pointer-events: auto;

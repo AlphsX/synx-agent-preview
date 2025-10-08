@@ -20,6 +20,9 @@ export { useSwipeGesture } from './useSwipeGesture';
 // Export app loading hook
 export { useAppLoading } from './useAppLoading';
 
+// Export mobile detection hook
+export { useMobileDetection } from './useTouchInteractions';
+
 // Hook for managing chat state
 export const useChat = () => {
   const [messages, setMessages] = useState<Message[]>([]);

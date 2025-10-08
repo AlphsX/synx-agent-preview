@@ -95,7 +95,14 @@ export const SearchToolsDropdown = ({ onToolSelect, selectedTool, isDarkMode, cl
         const fetchedTools = response.tools || [];
         
         // Transform backend tools to frontend format
-        const transformedTools: SearchTool[] = fetchedTools.map((tool: any) => {
+        const transformedTools: SearchTool[] = fetchedTools.map((tool: {
+          id: string;
+          name: string;
+          description: string;
+          available: boolean;
+          providers?: string[];
+          primary_provider?: string;
+        }) => {
           const colors = getColorForTool(tool.id);
           return {
             id: tool.id,
