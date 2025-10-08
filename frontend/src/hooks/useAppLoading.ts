@@ -7,22 +7,28 @@ export function useAppLoading() {
   const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
-    // Simulate app initialization
+    // Fast app initialization
     const initializeApp = async () => {
-      // Wait for hydration
+      // Mark as hydrated immediately
       setIsHydrated(true);
       
-      // Minimum loading time for smooth UX
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Reduced loading time for better UX (800ms instead of 1500ms)
+      const minLoadTime = new Promise(resolve => setTimeout(resolve, 800));
       
-      // Check if all critical resources are loaded
-      if (document.readyState === 'complete') {
-        setIsLoading(false);
-      } else {
-        window.addEventListener('load', () => {
-          setTimeout(() => setIsLoading(false), 300);
-        });
-      }
+      // Check if critical resources are loaded
+      const resourcesLoaded = new Promise(resolve => {
+        if (document.readyState === 'complete') {
+          resolve(true);
+        } else {
+          window.addEventListener('load', () => resolve(true), { once: true });
+        }
+      });
+      
+      // Wait for both minimum time and resources
+      await Promise.all([minLoadTime, resourcesLoaded]);
+      
+      // Small delay for smooth transition
+      setTimeout(() => setIsLoading(false), 100);
     };
 
     initializeApp();

@@ -12,30 +12,45 @@ export function LoadingScreen({
   onLoadingComplete,
 }: LoadingScreenProps) {
   const [progress, setProgress] = useState(0);
+  const [isExiting, setIsExiting] = useState(false);
 
   useEffect(() => {
     if (!isLoading) return;
 
-    const interval = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setTimeout(() => onLoadingComplete?.(), 300);
-          return 100;
-        }
-        return prev + Math.random() * 12;
-      });
-    }, 120);
+    const startTime = Date.now();
+    const duration = 800; // Match the useAppLoading duration
 
-    return () => clearInterval(interval);
+    const updateProgress = () => {
+      const elapsed = Date.now() - startTime;
+      const rawProgress = (elapsed / duration) * 100;
+
+      // Smooth easing curve (ease-out)
+      const easedProgress = 100 * (1 - Math.pow(1 - rawProgress / 100, 3));
+
+      setProgress(Math.min(easedProgress, 100));
+
+      if (rawProgress < 100) {
+        requestAnimationFrame(updateProgress);
+      } else {
+        // Start exit animation
+        setIsExiting(true);
+        setTimeout(() => onLoadingComplete?.(), 200);
+      }
+    };
+
+    requestAnimationFrame(updateProgress);
   }, [isLoading, onLoadingComplete]);
 
   if (!isLoading) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-white dark:bg-black">
+    <div
+      className={`fixed inset-0 z-50 flex items-center justify-center bg-white dark:bg-black transition-opacity duration-200 ${
+        isExiting ? "opacity-0" : "opacity-100"
+      }`}
+    >
       <div className="flex flex-col items-center space-y-8">
-        {/* SynxAI Logo */}
+        {/* SynxAI Logo with subtle animation */}
         <div className="w-20 h-20 flex items-center justify-center">
           <svg
             width="60"
@@ -43,7 +58,9 @@ export function LoadingScreen({
             viewBox="0 0 35 33"
             fill="none"
             xmlns="http://www.w3.org/2000/svg"
-            className="text-black dark:text-white"
+            className={`text-black dark:text-white transition-all duration-500 ${
+              progress > 50 ? "scale-105" : "scale-100"
+            }`}
           >
             <path
               d="M13.2371 21.0407L24.3186 12.8506C24.8619 12.4491 25.6384 12.6057 25.8973 13.2294C27.2597 16.5185 26.651 20.4712 23.9403 23.1851C21.2297 25.8989 17.4581 26.4941 14.0108 25.1386L10.2449 26.8843C15.6463 30.5806 22.2053 29.6665 26.304 25.5601C29.5551 22.3051 30.562 17.8683 29.6205 13.8673L29.629 13.8758C28.2637 7.99809 29.9647 5.64871 33.449 0.844576C33.5314 0.730667 33.6139 0.616757 33.6964 0.5L29.1113 5.09055V5.07631L13.2343 21.0436"
@@ -52,14 +69,46 @@ export function LoadingScreen({
           </svg>
         </div>
 
-        {/* Progress Bar */}
+        {/* Enhanced Progress Bar */}
         <div className="w-64 h-1 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-800">
           <div
-            className="h-full rounded-full transition-all duration-300 ease-out bg-black dark:bg-white"
-            style={{ width: `${Math.min(progress, 100)}%` }}
-          />
+            className="h-full rounded-full bg-black dark:bg-white relative overflow-hidden"
+            style={{
+              width: `${Math.min(progress, 100)}%`,
+              transition: "width 0.1s ease-out",
+            }}
+          >
+            {/* Shimmer effect */}
+            <div
+              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 dark:via-black/30 to-transparent animate-pulse"
+              style={{
+                animation:
+                  progress > 0 ? "shimmer 1.5s ease-in-out infinite" : "none",
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Loading text with fade animation */}
+        <div
+          className={`text-sm text-gray-600 dark:text-gray-400 transition-opacity duration-300 ${
+            progress > 80 ? "opacity-50" : "opacity-100"
+          }`}
+        >
+          
         </div>
       </div>
+
+      <style jsx>{`
+        @keyframes shimmer {
+          0% {
+            transform: translateX(-100%);
+          }
+          100% {
+            transform: translateX(100%);
+          }
+        }
+      `}</style>
     </div>
   );
 }
