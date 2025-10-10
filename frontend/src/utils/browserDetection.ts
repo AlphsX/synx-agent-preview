@@ -14,50 +14,50 @@ export const detectBrowser = (): BrowserInfo => {
   const userAgent = navigator.userAgent;
   const userAgentLower = userAgent.toLowerCase();
 
-  // Browser detection patterns
+  // Browser detection patterns (order matters for accurate detection)
   const browsers: Record<string, {
     pattern: RegExp;
     name: string;
     supported: boolean;
     exclude?: RegExp;
   }> = {
-    // Comet Browser
+    // Comet Browser (check first as it might be based on Chromium)
     comet: {
       pattern: /comet/i,
       name: 'Comet',
       supported: true
     },
-    // Arc Browser
+    // Arc Browser (check before Chrome as it's Chromium-based)
     arc: {
       pattern: /arc/i,
       name: 'Arc Browser',
       supported: true
     },
-    // Brave Browser (must be checked before Chrome)
+    // Brave Browser (check before Chrome as it's Chromium-based)
     brave: {
       pattern: /brave/i,
       name: 'Brave',
       supported: true
     },
-    // Chrome (must be checked after Brave and Arc)
-    chrome: {
-      pattern: /chrome/i,
-      name: 'Chrome',
-      supported: true,
-      exclude: /edg|opr|brave|arc|comet/i // Exclude Edge, Opera, Brave, Arc, Comet
-    },
-    // Safari (must be checked after Chrome-based browsers)
-    safari: {
-      pattern: /safari/i,
-      name: 'Safari',
-      supported: true,
-      exclude: /chrome|chromium|edg|opr|brave|arc|comet/i // Exclude Chrome-based browsers
-    },
-    // Firefox
+    // Firefox (check before Chrome to avoid false positives)
     firefox: {
       pattern: /firefox/i,
       name: 'Firefox',
       supported: true
+    },
+    // Chrome (check after other Chromium-based browsers)
+    chrome: {
+      pattern: /chrome/i,
+      name: 'Chrome',
+      supported: true,
+      exclude: /edg|opr|brave|arc|comet|firefox/i // Exclude other browsers
+    },
+    // Safari (check last as it might appear in other browser user agents)
+    safari: {
+      pattern: /safari/i,
+      name: 'Safari',
+      supported: true,
+      exclude: /chrome|chromium|edg|opr|brave|arc|comet|firefox/i // Exclude other browsers
     }
   };
 
@@ -146,11 +146,27 @@ export const checkSpeechRecognitionSupport = (browserInfo: BrowserInfo): {
   if (!SpeechRecognition) {
     let message = `Voice input is not supported in ${browserInfo.name}.`;
     
-    // Provide specific guidance for supported browsers
+    // Provide specific guidance for supported browsers and mobile OS
+    const userAgent = navigator.userAgent;
+    
     if (browserInfo.name === 'Firefox') {
       message = `Voice input is not yet supported in Firefox. Please use Chrome, Safari, Brave, or Arc Browser for voice features.`;
     } else if (browserInfo.name === 'Safari') {
-      message = `Voice input requires Safari 14.1+ on macOS or iOS 14.5+. Please update your browser.`;
+      if (/iPhone|iPad|iPod/i.test(userAgent)) {
+        message = `Voice input requires iOS 14.5+ and Safari 14.1+. Please update your device.`;
+      } else {
+        message = `Voice input requires Safari 14.1+ on macOS. Please update your browser.`;
+      }
+    } else if (/Android/i.test(userAgent)) {
+      if (/MIUI|HyperOS/i.test(userAgent)) {
+        message = `Voice input on Xiaomi devices works best with Chrome. Please use Chrome browser.`;
+      } else if (/HarmonyOS|EMUI/i.test(userAgent)) {
+        message = `Voice input on Huawei devices works best with Chrome. Please use Chrome browser.`;
+      } else if (/Samsung|OneUI/i.test(userAgent)) {
+        message = `Voice input on Samsung devices works best with Chrome or Samsung Internet. Please use Chrome browser.`;
+      } else {
+        message = `Voice input on Android requires Chrome 25+. Please use Chrome browser.`;
+      }
     }
     
     return {

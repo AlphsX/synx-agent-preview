@@ -83,6 +83,7 @@ import {
   detectBrowser,
   checkSpeechRecognitionSupport,
 } from "@/utils/browserDetection";
+import { detectMobileOS, getMobilePatterns } from "@/utils/mobileDetection";
 
 // Type definitions for SpeechRecognition API
 interface SpeechRecognitionEvent extends Event {
@@ -199,6 +200,7 @@ export default function Home() {
     typeof detectBrowser
   > | null>(null);
   const [showBrowserWarning, setShowBrowserWarning] = useState(false);
+  const [mobileInfo, setMobileInfo] = useState<ReturnType<typeof detectMobileOS> | null>(null);
 
   // Voice recognition state variables
   const [isListening, setIsListening] = useState(false);
@@ -260,10 +262,13 @@ export default function Home() {
     setIsHydrated(true);
   }, []);
 
-  // Browser detection effect
+  // Browser and mobile detection effect
   useEffect(() => {
     const browser = detectBrowser();
     setBrowserInfo(browser);
+
+    const mobile = detectMobileOS();
+    setMobileInfo(mobile);
 
     // Show browser warning if not supported
     if (!browser.isSupported) {
@@ -682,11 +687,11 @@ Please ensure the enhanced backend service is running on http://localhost:8000 a
     const SpeechRecognition =
       window.SpeechRecognition || window.webkitSpeechRecognition;
 
-    // Check for mobile device
-    const isMobile =
-      /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
-        navigator.userAgent
-      );
+    // Check for mobile device - Enhanced support for more mobile OS
+    const mobilePatterns = getMobilePatterns();
+    const isMobile = mobilePatterns.enhanced.test(navigator.userAgent) || 
+                     (mobileInfo && mobileInfo.isMobile) || 
+                     window.innerWidth <= 768;
 
     // Check specifically for iOS Safari
     const isIOSSafari =
@@ -935,7 +940,7 @@ Please ensure the enhanced backend service is running on http://localhost:8000 a
         speechRecognitionRef.current = null;
       }
     };
-  }, [browserInfo]); // Add browserInfo dependency
+  }, [browserInfo, mobileInfo]); // Add dependencies
 
   const toggleVoiceRecognition = useCallback(() => {
     // Check browser compatibility first
@@ -962,11 +967,11 @@ Please ensure the enhanced backend service is running on http://localhost:8000 a
       return;
     }
 
-    // Check for mobile device
-    const isMobile =
-      /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
-        navigator.userAgent
-      );
+    // Check for mobile device - Enhanced support for more mobile OS
+    const mobilePatterns = getMobilePatterns();
+    const isMobile = mobilePatterns.enhanced.test(navigator.userAgent) || 
+                     (mobileInfo && mobileInfo.isMobile) || 
+                     window.innerWidth <= 768;
 
     // Check specifically for iOS Safari
     const isIOSSafari =
@@ -1090,7 +1095,7 @@ Please ensure the enhanced backend service is running on http://localhost:8000 a
         }
       }
     }
-  }, [browserInfo]);
+  }, [browserInfo, mobileInfo]);
 
   // Keyboard shortcut to focus input field (⌘+J on Mac, Ctrl+J on Windows/Linux)
   // and to trigger voice recognition (Cmd+Enter on Mac, Ctrl+Enter on Windows/Linux)
@@ -1890,7 +1895,7 @@ Please ensure the enhanced backend service is running on http://localhost:8000 a
                             type="button"
                             className={`flex-shrink-0 w-9 h-9 md:w-9 md:h-9 flex items-center justify-center rounded-full transition-all duration-200 touch-manipulation ${
                               isListening
-                                ? "text-red-500 hover:bg-red-500/10 bg-red-500/5 animate-pulse"
+                                ? "text-red-500 hover:bg-red-500/10 bg-red-500/5"
                                 : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
                             } ${
                               // Add mobile-specific styling with larger touch targets for iOS

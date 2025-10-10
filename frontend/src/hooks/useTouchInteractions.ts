@@ -319,7 +319,11 @@ export const useMobileDetection = () => {
   useEffect(() => {
     const checkMobile = () => {
       const userAgent = navigator.userAgent.toLowerCase();
-      const mobileKeywords = ['mobile', 'android', 'iphone', 'ipad', 'ipod', 'blackberry', 'windows phone'];
+      const mobileKeywords = [
+        'mobile', 'android', 'iphone', 'ipad', 'ipod', 'blackberry', 'windows phone',
+        'miui', 'harmonyos', 'hyperos', 'emui', 'funtouch', 'coloros', 'oxygenos', 'oneui',
+        'samsung', 'xiaomi', 'huawei', 'oppo', 'vivo', 'oneplus', 'realme'
+      ];
       const isMobileDevice = mobileKeywords.some(keyword => userAgent.includes(keyword));
       
       setIsMobile(isMobileDevice || window.innerWidth <= 768);
