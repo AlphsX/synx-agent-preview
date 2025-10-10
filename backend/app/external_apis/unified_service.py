@@ -326,8 +326,17 @@ class UnifiedExternalAPIService:
     async def _fetch_web_search_context(self, query: str) -> Dict[str, Any]:
         """Fetch web search context."""
         try:
+            logger.info(f"Fetching web search context for: {query}")
             web_results = await self.search_service.search_web(query, count=5)
             news_results = await self.search_service.search_news(query, count=3)
+            
+            # Ensure results are lists
+            if web_results is None:
+                web_results = []
+            if news_results is None:
+                news_results = []
+            
+            logger.info(f"Web search results: {len(web_results)} web, {len(news_results)} news")
             
             return {
                 "web_search": {
@@ -338,6 +347,8 @@ class UnifiedExternalAPIService:
             }
         except Exception as e:
             logger.error(f"Web search context fetch failed: {str(e)}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
             return {}
     
     async def _fetch_crypto_context(self, query: str) -> Dict[str, Any]:

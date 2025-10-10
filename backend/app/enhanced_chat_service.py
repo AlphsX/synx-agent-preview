@@ -12,7 +12,7 @@ from app.config import settings
 from app.external_apis.search_service import search_service
 from app.external_apis.binance import BinanceService
 from app.external_apis.unified_service import unified_service
-from app.ai.enhanced_service import EnhancedAIService
+from app.agent.enhanced_service import EnhancedAIService
 from app.vector.service import vector_service
 from app.conversation_service import conversation_service
 from app.auth.schemas import UserResponse

@@ -30,12 +30,18 @@ class CollaborationWebSocketManager:
         
         # Background tasks
         self.cleanup_task = None
-        self.start_background_tasks()
+        self._tasks_started = False
     
     def start_background_tasks(self):
         """Start background cleanup tasks."""
-        if not self.cleanup_task:
-            self.cleanup_task = asyncio.create_task(self._background_cleanup())
+        if not self._tasks_started:
+            try:
+                if not self.cleanup_task:
+                    self.cleanup_task = asyncio.create_task(self._background_cleanup())
+                self._tasks_started = True
+            except RuntimeError:
+                # No event loop running, tasks will be started later
+                pass
     
     async def connect(
         self,
@@ -48,6 +54,10 @@ class CollaborationWebSocketManager:
     ):
         """Connect a WebSocket to a conversation."""
         await websocket.accept()
+        
+        # Start background tasks if not already started
+        if not self._tasks_started:
+            self.start_background_tasks()
         
         # Initialize conversation connections if needed
         if conversation_id not in self.active_connections:

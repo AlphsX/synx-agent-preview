@@ -61,6 +61,25 @@ class MigrationManager:
         )
         return [row['version'] for row in result]
     
+    async def get_applied_migrations_session(self, session) -> List[str]:
+        """Get list of applied migration versions using SQLAlchemy session."""
+        from sqlalchemy import text
+        
+        # Ensure migration table exists
+        await session.execute(text(f"""
+            CREATE TABLE IF NOT EXISTS {self._migration_table} (
+                version VARCHAR(50) PRIMARY KEY,
+                description TEXT,
+                applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """))
+        await session.commit()
+        
+        result = await session.execute(
+            text(f"SELECT version FROM {self._migration_table} ORDER BY version")
+        )
+        return [row[0] for row in result.fetchall()]
+    
     async def apply_migration(self, migration: Migration, connection):
         """Apply a single migration."""
         try:
@@ -87,6 +106,38 @@ class MigrationManager:
             logger.error(f"Failed to apply migration {migration.version}: {e}")
             raise
     
+    async def apply_migration_session(self, migration: Migration, session):
+        """Apply a single migration using SQLAlchemy session."""
+        from sqlalchemy import text
+        
+        try:
+            logger.info(f"Applying migration {migration.version}: {migration.description}")
+            
+            # Apply migration (migrations should handle SQLAlchemy sessions)
+            if hasattr(migration, 'up_session'):
+                await migration.up_session(session)
+            else:
+                # Fallback: try to adapt the migration
+                logger.warning(f"Migration {migration.version} doesn't have up_session method, skipping")
+                return
+            
+            # Record migration as applied
+            await session.execute(text(f"""
+                INSERT INTO {self._migration_table} (version, description)
+                VALUES (:version, :description)
+            """), {
+                "version": migration.version,
+                "description": migration.description
+            })
+            await session.commit()
+            
+            logger.info(f"Successfully applied migration {migration.version}")
+            
+        except Exception as e:
+            await session.rollback()
+            logger.error(f"Failed to apply migration {migration.version}: {e}")
+            raise
+    
     async def rollback_migration(self, migration: Migration, connection):
         """Rollback a single migration."""
         try:
@@ -110,9 +161,30 @@ class MigrationManager:
     
     async def migrate_up(self, target_version: Optional[str] = None):
         """Apply all pending migrations up to target version."""
-        async with db_manager.get_connection() as connection:
-            applied_migrations = await self.get_applied_migrations(connection)
+        try:
+            async with db_manager.get_connection() as connection:
+                applied_migrations = await self.get_applied_migrations(connection)
+        except NotImplementedError:
+            # SQLite doesn't support raw connections, use session instead
+            async with db_manager.get_session() as session:
+                applied_migrations = await self.get_applied_migrations_session(session)
             
+                for migration in self.migrations:
+                    if migration.version in applied_migrations:
+                        continue
+                    
+                    if target_version and migration.version > target_version:
+                        break
+                    
+                    try:
+                        # Apply migration using session for SQLite
+                        await self.apply_migration_session(migration, session)
+                    except Exception as e:
+                        logger.error(f"Migration {migration.version} failed: {e}")
+                        raise
+                return
+            
+            # PostgreSQL path
             for migration in self.migrations:
                 if migration.version in applied_migrations:
                     continue
@@ -124,8 +196,13 @@ class MigrationManager:
     
     async def migrate_down(self, target_version: str):
         """Rollback migrations down to target version."""
-        async with db_manager.get_connection() as connection:
-            applied_migrations = await self.get_applied_migrations(connection)
+        try:
+            async with db_manager.get_connection() as connection:
+                applied_migrations = await self.get_applied_migrations(connection)
+        except NotImplementedError:
+            # SQLite doesn't support raw connections
+            logger.warning("Migration rollback not fully supported for SQLite")
+            return
             
             # Find migrations to rollback (in reverse order)
             migrations_to_rollback = []
@@ -138,8 +215,13 @@ class MigrationManager:
     
     async def get_migration_status(self) -> Dict[str, Any]:
         """Get current migration status."""
-        async with db_manager.get_connection() as connection:
-            applied_migrations = await self.get_applied_migrations(connection)
+        try:
+            async with db_manager.get_connection() as connection:
+                applied_migrations = await self.get_applied_migrations(connection)
+        except NotImplementedError:
+            # SQLite doesn't support raw connections, use session instead
+            async with db_manager.get_session() as session:
+                applied_migrations = await self.get_applied_migrations_session(session)
             
             pending_migrations = [
                 m for m in self.migrations 

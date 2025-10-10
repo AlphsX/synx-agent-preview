@@ -3,6 +3,7 @@ import os
 import asyncio
 import requests
 import urllib3
+import sys
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -12,6 +13,10 @@ import uvicorn
 import json
 import time
 from datetime import datetime
+import re
+
+# Add the backend directory to Python path
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 # Disable SSL warnings for development
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -19,6 +24,17 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 # Load environment variables
 from dotenv import load_dotenv
 load_dotenv()
+
+# Import search services
+try:
+    from app.external_apis.search_service import search_service
+    from app.external_apis.serpapi import SerpAPIService
+    from app.external_apis.brave_search import BraveSearchService
+    SEARCH_AVAILABLE = True
+    print("✅ Search services imported successfully")
+except ImportError as e:
+    print(f"⚠️ Search services not available: {e}")
+    SEARCH_AVAILABLE = False
 
 app = FastAPI(title="AI Agent API", version="1.0.0")
 
@@ -186,6 +202,71 @@ def detect_crypto_query(message: str) -> Optional[str]:
     
     return None
 
+def needs_current_data(message: str) -> bool:
+    """Detect if message is asking for current/latest information"""
+    message_lower = message.lower()
+    
+    current_keywords = [
+        'latest', 'recent', 'current', 'today', 'now', 'breaking', 'news',
+        'update', 'happening', 'trend', 'trending', 'what\'s new', 'recent news',
+        'latest news', 'current events', 'today\'s news', 'breaking news',
+        'ข่าวล่าสุด', 'ข่าวใหม่', 'ข่าววันนี้', 'เหตุการณ์ล่าสุด', 'อัพเดท'
+    ]
+    
+    return any(keyword in message_lower for keyword in current_keywords)
+
+async def get_current_data(message: str) -> Optional[str]:
+    """Get current data using search services"""
+    if not SEARCH_AVAILABLE:
+        return None
+    
+    try:
+        print(f"🔍 Searching for current data: {message}")
+        
+        # Try web search first
+        web_results = await search_service.search_web(message, count=5)
+        news_results = await search_service.search_news(message, count=3)
+        
+        if not web_results and not news_results:
+            print("⚠️ No search results found")
+            return None
+        
+        # Format results for AI context
+        context_data = []
+        
+        if web_results:
+            context_data.append("=== WEB SEARCH RESULTS ===")
+            for i, result in enumerate(web_results[:3], 1):
+                title = result.get('title', 'No title')
+                description = result.get('description', 'No description')
+                url = result.get('url', '')
+                context_data.append(f"{i}. {title}")
+                if description:
+                    context_data.append(f"   {description}")
+                context_data.append("")
+        
+        if news_results:
+            context_data.append("=== LATEST NEWS ===")
+            for i, result in enumerate(news_results[:3], 1):
+                title = result.get('title', 'No title')
+                description = result.get('description', 'No description')
+                published = result.get('published', '')
+                source = result.get('source', '')
+                context_data.append(f"{i}. {title}")
+                if description:
+                    context_data.append(f"   {description}")
+                if published:
+                    context_data.append(f"   Published: {published}")
+                if source:
+                    context_data.append(f"   Source: {source}")
+                context_data.append("")
+        
+        return "\n".join(context_data)
+        
+    except Exception as e:
+        print(f"❌ Error getting current data: {e}")
+        return None
+
 @app.get("/")
 async def root():
     return {
@@ -240,6 +321,25 @@ async def generate_groq_response(message: str, model_id: str):
         # Check if this is a crypto price query
         crypto_symbol = detect_crypto_query(message)
         enhanced_prompt = SYNX_SYSTEM_PROMPT
+        
+        # Check if user is asking for current/latest information
+        needs_search = needs_current_data(message)
+        
+        print(f"DEBUG: Processing message: {message}")
+        print(f"DEBUG: Crypto symbol detected: {crypto_symbol}")
+        print(f"DEBUG: Needs current data: {needs_search}")
+        print(f"DEBUG: Model ID: {model_id}")
+        
+        # Get current data if needed
+        current_data = None
+        if needs_search:
+            current_data = await get_current_data(message)
+            if current_data:
+                enhanced_prompt += f"\n\n=== CURRENT INFORMATION ===\n{current_data}\n\nIMPORTANT: Use this current information to answer the user's question. This data is from recent web searches and news sources. Present the information in a natural, conversational way."
+                print("✅ Added current data to prompt")
+            else:
+                enhanced_prompt += f"\n\nNote: I tried to get current information but couldn't access real-time data right now. I'll provide general information instead."
+                print("⚠️ Could not get current data")
         
         if crypto_symbol:
             # Get crypto price data

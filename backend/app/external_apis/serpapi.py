@@ -55,7 +55,7 @@ class SerpAPIService:
         try:
             await self._check_rate_limit()
             
-            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=self.timeout)) as session:
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=self.timeout), connector=aiohttp.TCPConnector(ssl=False)) as session:
                 response_data = await self._make_request_with_retry(session, params)
                 
                 if not response_data:
@@ -136,7 +136,7 @@ class SerpAPIService:
         try:
             await self._check_rate_limit()
             
-            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=self.timeout)) as session:
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=self.timeout), connector=aiohttp.TCPConnector(ssl=False)) as session:
                 response_data = await self._make_request_with_retry(session, params)
                 
                 if not response_data:
@@ -270,7 +270,7 @@ class SerpAPIService:
                 "num": 1
             }
             
-            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=5)) as session:
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=5), connector=aiohttp.TCPConnector(ssl=False)) as session:
                 async with session.get(self.base_url, params=params) as response:
                     if response.status == 200:
                         data = await response.json()

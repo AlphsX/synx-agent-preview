@@ -10,8 +10,8 @@ from app.chat.router import router as chat_router
 from app.enhanced_chat_router import router as enhanced_chat_router
 from app.external_apis_router import router as external_apis_router
 from app.external_apis_enhanced_router import router as external_apis_enhanced_router
-from app.ai.endpoints import router as ai_router
-from app.ai.optimization_router import router as ai_optimization_router
+from app.agent.endpoints import router as ai_router
+from app.agent.optimization_router import router as ai_optimization_router
 from app.vector.router import router as vector_router
 from app.vector.enhanced_router import router as enhanced_vector_router
 from app.analytics.router import router as analytics_router

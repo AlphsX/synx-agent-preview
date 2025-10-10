@@ -8,7 +8,7 @@ import asyncio
 import logging
 from typing import Dict, Any, List
 from datetime import datetime
-from ..plugin_system import DataSourcePlugin
+from app.external_apis.plugin_system import DataSourcePlugin
 
 logger = logging.getLogger(__name__)
 

@@ -63,7 +63,7 @@ class BraveSearchService:
         try:
             await self._check_rate_limit()
             
-            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=self.timeout)) as session:
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=self.timeout), connector=aiohttp.TCPConnector(ssl=False)) as session:
                 response_data = await self._make_request_with_retry(
                     session, f"{self.base_url}/web/search", params
                 )
@@ -134,7 +134,7 @@ class BraveSearchService:
         try:
             await self._check_rate_limit()
             
-            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=self.timeout)) as session:
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=self.timeout), connector=aiohttp.TCPConnector(ssl=False)) as session:
                 response_data = await self._make_request_with_retry(
                     session, f"{self.base_url}/news/search", params
                 )
@@ -259,7 +259,7 @@ class BraveSearchService:
                 "count": 1
             }
             
-            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=5)) as session:
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=5), connector=aiohttp.TCPConnector(ssl=False)) as session:
                 async with session.get(
                     f"{self.base_url}/web/search", 
                     params=params, 

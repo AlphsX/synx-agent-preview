@@ -14,7 +14,7 @@ from typing import List, Dict, Any, Optional
 import logging
 
 from .enhanced_service import EnhancedAIService
-from ..auth.middleware import get_current_user_optional
+from ..auth.middleware import get_current_user
 from ..auth.schemas import UserResponse
 
 logger = logging.getLogger(__name__)
@@ -60,7 +60,7 @@ class EnhancedChatRequest(BaseModel):
 async def get_model_recommendation(
     message: str = Query(..., description="The user query to analyze"),
     priority: str = Query("balanced", description="Priority: speed, quality, cost, or balanced"),
-    user: Optional[UserResponse] = Depends(get_current_user_optional)
+    user: Optional[UserResponse] = Depends(get_current_user)
 ):
     """Get AI model recommendation based on query analysis"""
     try:
@@ -91,7 +91,7 @@ async def get_model_recommendation(
 @router.post("/models/recommendation")
 async def get_detailed_model_recommendation(
     request: ModelRecommendationRequest,
-    user: Optional[UserResponse] = Depends(get_current_user_optional)
+    user: Optional[UserResponse] = Depends(get_current_user)
 ):
     """Get detailed AI model recommendation with context"""
     try:
@@ -123,7 +123,7 @@ async def get_detailed_model_recommendation(
 
 @router.get("/analytics")
 async def get_optimization_analytics(
-    user: Optional[UserResponse] = Depends(get_current_user_optional)
+    user: Optional[UserResponse] = Depends(get_current_user)
 ):
     """Get comprehensive optimization analytics and recommendations"""
     try:
@@ -145,7 +145,7 @@ async def get_optimization_analytics(
 
 @router.get("/analytics/summary")
 async def get_analytics_summary(
-    user: Optional[UserResponse] = Depends(get_current_user_optional)
+    user: Optional[UserResponse] = Depends(get_current_user)
 ):
     """Get a summary of optimization analytics"""
     try:
@@ -183,7 +183,7 @@ async def get_analytics_summary(
 
 @router.get("/settings")
 async def get_optimization_settings(
-    user: Optional[UserResponse] = Depends(get_current_user_optional)
+    user: Optional[UserResponse] = Depends(get_current_user)
 ):
     """Get current optimization settings"""
     try:
@@ -204,7 +204,7 @@ async def get_optimization_settings(
 @router.post("/settings")
 async def update_optimization_settings(
     request: OptimizationSettingsRequest,
-    user: Optional[UserResponse] = Depends(get_current_user_optional)
+    user: Optional[UserResponse] = Depends(get_current_user)
 ):
     """Update optimization settings (requires authentication)"""
     if not user:
@@ -238,7 +238,7 @@ async def update_optimization_settings(
 @router.get("/models/performance")
 async def get_model_performance(
     model_id: Optional[str] = Query(None, description="Specific model ID to get performance for"),
-    user: Optional[UserResponse] = Depends(get_current_user_optional)
+    user: Optional[UserResponse] = Depends(get_current_user)
 ):
     """Get performance metrics for models"""
     try:
@@ -274,7 +274,7 @@ async def get_model_performance(
 
 @router.get("/cost-analysis")
 async def get_cost_analysis(
-    user: Optional[UserResponse] = Depends(get_current_user_optional)
+    user: Optional[UserResponse] = Depends(get_current_user)
 ):
     """Get detailed cost analysis"""
     try:
@@ -304,7 +304,7 @@ async def get_cost_analysis(
 
 @router.post("/data/export")
 async def export_optimization_data(
-    user: Optional[UserResponse] = Depends(get_current_user_optional)
+    user: Optional[UserResponse] = Depends(get_current_user)
 ):
     """Export optimization data for backup (requires authentication)"""
     if not user:
@@ -331,7 +331,7 @@ async def export_optimization_data(
 @router.post("/data/import")
 async def import_optimization_data(
     data: Dict[str, Any],
-    user: Optional[UserResponse] = Depends(get_current_user_optional)
+    user: Optional[UserResponse] = Depends(get_current_user)
 ):
     """Import optimization data from backup (requires authentication)"""
     if not user:
@@ -359,7 +359,7 @@ async def import_optimization_data(
 
 @router.delete("/data/clear")
 async def clear_optimization_data(
-    user: Optional[UserResponse] = Depends(get_current_user_optional)
+    user: Optional[UserResponse] = Depends(get_current_user)
 ):
     """Clear all optimization data (requires authentication)"""
     if not user:
