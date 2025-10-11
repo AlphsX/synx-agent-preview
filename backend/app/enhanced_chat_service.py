@@ -12,6 +12,7 @@ from app.config import settings
 from app.external_apis.search_service import search_service
 from app.external_apis.binance import BinanceService
 from app.external_apis.unified_service import unified_service
+from app.external_apis.groq_compound_service import groq_compound_service
 from app.agent.enhanced_service import EnhancedAIService
 from app.vector.service import vector_service
 from app.conversation_service import conversation_service
@@ -27,6 +28,7 @@ class EnhancedChatService:
         self.binance_service = BinanceService()
         self.vector_service = vector_service
         self.unified_service = unified_service
+        self.groq_compound_service = groq_compound_service
         self.safe_data = SafeDataHandler()
         
         # Redis for conversation history caching
@@ -70,7 +72,6 @@ class EnhancedChatService:
             logger.warning(f"Redis connection failed: {e}. Conversation caching disabled.")
             self.redis_client = None
         
-    @safe_async_generator("Oops! Something went wrong on my end: 'NoneType' object is not subscriptable 😅 Let me try to help you anyway! 💫")
     async def generate_ai_response(self, 
                                  message: str,
                                  model_id: str,
@@ -99,6 +100,52 @@ class EnhancedChatService:
             
             if conversation_history is None:
                 conversation_history = []
+            
+            # Check if message contains URLs and should use Groq compound model
+            if self.groq_compound_service.should_use_compound_model(message):
+                logger.info("Using Groq compound model for URL-based query")
+                
+                # Use compound model for URL processing
+                try:
+                    response_generated = False
+                    response_content = ""
+                    
+                    async for chunk in self.groq_compound_service.generate_response_with_urls(
+                        message=message,
+                        conversation_history=conversation_history,
+                        stream=True,
+                        temperature=0.7,
+                        max_tokens=4000
+                    ):
+                        if chunk and chunk.strip():  # Only yield non-empty chunks
+                            response_generated = True
+                            response_content += chunk
+                            yield chunk
+                    
+                    # If we got a response, store it and return
+                    if response_generated:
+                        if conversation_id:
+                            try:
+                                await self._store_user_message(conversation_id, message, user_context)
+                                await self._store_ai_response(
+                                    conversation_id, 
+                                    response_content, 
+                                    "groq/compound", 
+                                    {"used_compound_model": True, "urls_detected": self.groq_compound_service.detect_urls_in_message(message)}, 
+                                    user_context
+                                )
+                            except Exception as storage_error:
+                                logger.warning(f"Failed to store compound model response: {storage_error}")
+                        
+                        return  # Exit early since we used compound model successfully
+                    else:
+                        logger.warning("Compound model returned empty response, falling back to regular processing")
+                        yield "🔄 Switching to regular AI model for better response...\n\n"
+                    
+                except Exception as compound_error:
+                    logger.error(f"Groq compound model failed: {compound_error}")
+                    # Fall back to regular processing
+                    yield f"⚠️ URL processing encountered an issue, using regular AI model instead...\n\n"
             
             # Analyze message for external data needs with intelligent context detection
             enhanced_context = await self._get_enhanced_context(message, user_context)
@@ -173,9 +220,30 @@ class EnhancedChatService:
             had_errors = True
             error_details = {"general_error": str(e)}
             logger.error(f"Error in generate_ai_response: {e}")
-            # Fallback to safe mock response
-            async for chunk in error_handler.safe_generate_mock_response(message, {}):
-                yield chunk
+            
+            # Check if this is a compound model related error
+            if "compound" in str(e).lower() or "url" in str(e).lower():
+                yield f"❌ There was an issue processing the URLs in your message. Error: {str(e)}\n\n"
+                yield "Let me try to help you with the information I have available:\n\n"
+                
+                # Try to provide a helpful response without compound model
+                try:
+                    urls = self.groq_compound_service.detect_urls_in_message(message)
+                    if urls:
+                        yield f"I detected these URLs in your message: {', '.join(urls)}\n\n"
+                        yield "While I can't browse these websites right now, I can help you with:\n"
+                        yield "• General information about the topics\n"
+                        yield "• Suggestions on where to find current information\n"
+                        yield "• Analysis based on my existing knowledge\n\n"
+                        yield "What specific aspect would you like me to help with?"
+                    else:
+                        yield "How can I assist you with your question?"
+                except:
+                    yield "How can I help you today?"
+            else:
+                # General error fallback
+                async for chunk in error_handler.safe_generate_mock_response(message, {}):
+                    yield chunk
     
     async def _get_enhanced_context(self, message: str, user_context: Dict[str, Any] = None) -> Dict[str, Any]:
         """Intelligent context detection and data retrieval from multiple sources using unified service"""

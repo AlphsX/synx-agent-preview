@@ -25,6 +25,15 @@ class GroqProvider(BaseAIProvider):
         # Groq model configurations with optimized parameters
         self.models = [
             AIModel(
+                id="groq/compound",
+                name="Groq Compound Model",
+                provider="groq",
+                description="Groq's compound model with web browsing capabilities for URL analysis",
+                max_tokens=8192,
+                supports_streaming=True,
+                available=self.available
+            ),
+            AIModel(
                 id="openai/gpt-oss-120b",
                 name="GPT OSS 120B",
                 provider="groq",
@@ -92,6 +101,14 @@ class GroqProvider(BaseAIProvider):
         
         # Model-specific parameter optimizations
         self.model_configs = {
+            "groq/compound": {
+                "temperature": 0.7,
+                "max_tokens": 4096,
+                "top_p": 1.0,
+                "frequency_penalty": 0.0,
+                "presence_penalty": 0.0,
+                "stop": None
+            },
             "openai/gpt-oss-120b": {
                 "temperature": 0.7,
                 "max_tokens": 4096,
@@ -255,6 +272,10 @@ class GroqProvider(BaseAIProvider):
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json"
         }
+        
+        # Add special header for compound model
+        if model_id == "groq/compound":
+            headers["Groq-Model-Version"] = "latest"
         
         payload = {
             "model": model_id,

@@ -16,6 +16,7 @@ from .external_apis import (
     WeatherService, StockService, SentimentAnalysisService,
     PluginManager, unified_service
 )
+from .external_apis.groq_compound_service import groq_compound_service
 
 logger = logging.getLogger(__name__)
 
@@ -378,3 +379,139 @@ async def quick_sentiment(
 
 
 import asyncio  # Import needed for gather operations
+
+# =============================================================================
+# Groq Compound Model Endpoints
+# =============================================================================
+
+@router.get("/groq-compound/status")
+async def get_groq_compound_status() -> Dict[str, Any]:
+    """Get status of Groq compound model service."""
+    try:
+        return {
+            "available": groq_compound_service.is_available(),
+            "model": groq_compound_service.compound_model,
+            "timeout": groq_compound_service.timeout,
+            "max_retries": groq_compound_service.max_retries
+        }
+    except Exception as e:
+        logger.error(f"Groq compound status error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Groq compound service error: {str(e)}")
+
+
+@router.post("/groq-compound/analyze-url")
+async def analyze_url_with_compound(
+    url: str = Query(..., description="URL to analyze"),
+    question: Optional[str] = Query(None, description="Specific question about the URL")
+) -> Dict[str, Any]:
+    """Analyze a URL using Groq's compound model."""
+    try:
+        if not groq_compound_service.is_available():
+            raise HTTPException(status_code=503, detail="Groq compound model service not available")
+        
+        # Create message with URL
+        if question:
+            message = f"{question} URL: {url}"
+        else:
+            message = f"Please analyze and summarize the content of this URL: {url}"
+        
+        # Generate response
+        response_content = ""
+        async for chunk in groq_compound_service.generate_response_with_urls(
+            message=message,
+            stream=False
+        ):
+            response_content += chunk
+        
+        return {
+            "url": url,
+            "question": question,
+            "analysis": response_content,
+            "model": groq_compound_service.compound_model
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Groq compound URL analysis error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"URL analysis error: {str(e)}")
+
+
+@router.post("/groq-compound/chat-with-urls")
+async def chat_with_urls(
+    message: str = Query(..., description="Message that may contain URLs"),
+    conversation_history: Optional[List[Dict[str, str]]] = None
+) -> Dict[str, Any]:
+    """Chat with Groq compound model, automatically detecting and processing URLs."""
+    try:
+        if not groq_compound_service.is_available():
+            raise HTTPException(status_code=503, detail="Groq compound model service not available")
+        
+        # Check if message should use compound model
+        should_use_compound = groq_compound_service.should_use_compound_model(message)
+        detected_urls = groq_compound_service.detect_urls_in_message(message)
+        
+        if not should_use_compound:
+            return {
+                "message": message,
+                "should_use_compound": False,
+                "detected_urls": detected_urls,
+                "response": "No URLs detected or compound model not needed for this query."
+            }
+        
+        # Generate response using compound model
+        response_content = ""
+        async for chunk in groq_compound_service.generate_response_with_urls(
+            message=message,
+            conversation_history=conversation_history or [],
+            stream=False
+        ):
+            response_content += chunk
+        
+        return {
+            "message": message,
+            "should_use_compound": True,
+            "detected_urls": detected_urls,
+            "response": response_content,
+            "model": groq_compound_service.compound_model
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Groq compound chat error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Chat error: {str(e)}")
+
+
+@router.post("/groq-compound/test")
+async def test_groq_compound(
+    test_url: str = Query("https://groq.com", description="URL to test with")
+) -> Dict[str, Any]:
+    """Test Groq compound model functionality."""
+    try:
+        result = await groq_compound_service.test_compound_model(test_url)
+        return result
+    except Exception as e:
+        logger.error(f"Groq compound test error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Test error: {str(e)}")
+
+
+@router.get("/groq-compound/detect-urls")
+async def detect_urls_in_text(
+    text: str = Query(..., description="Text to analyze for URLs")
+) -> Dict[str, Any]:
+    """Detect URLs in a given text."""
+    try:
+        urls = groq_compound_service.detect_urls_in_message(text)
+        should_use_compound = groq_compound_service.should_use_compound_model(text)
+        
+        return {
+            "text": text,
+            "detected_urls": urls,
+            "should_use_compound": should_use_compound,
+            "url_count": len(urls)
+        }
+        
+    except Exception as e:
+        logger.error(f"URL detection error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"URL detection error: {str(e)}")
