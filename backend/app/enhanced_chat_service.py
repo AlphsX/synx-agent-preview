@@ -101,54 +101,45 @@ class EnhancedChatService:
             if conversation_history is None:
                 conversation_history = []
             
-            # Check if message contains URLs and should use Groq compound model
+            # Check if message contains URLs - use compound model to fetch website data
+            website_data = None
             if self.groq_compound_service.should_use_compound_model(message):
-                logger.info("Using Groq compound model for URL-based query")
+                logger.info("Detected URLs in message, using Groq compound model to extract website data")
                 
-                # Use compound model for URL processing
                 try:
-                    response_generated = False
-                    response_content = ""
+                    yield "🌐 Visiting and analyzing website content...\n\n"
                     
-                    async for chunk in self.groq_compound_service.generate_response_with_urls(
-                        message=message,
-                        conversation_history=conversation_history,
-                        stream=True,
-                        temperature=0.7,
-                        max_tokens=4000
-                    ):
-                        if chunk and chunk.strip():  # Only yield non-empty chunks
-                            response_generated = True
-                            response_content += chunk
-                            yield chunk
+                    # Extract website data using compound model
+                    extraction_result = await self.groq_compound_service.extract_website_data(message)
                     
-                    # If we got a response, store it and return
-                    if response_generated:
-                        if conversation_id:
-                            try:
-                                await self._store_user_message(conversation_id, message, user_context)
-                                await self._store_ai_response(
-                                    conversation_id, 
-                                    response_content, 
-                                    "groq/compound", 
-                                    {"used_compound_model": True, "urls_detected": self.groq_compound_service.detect_urls_in_message(message)}, 
-                                    user_context
-                                )
-                            except Exception as storage_error:
-                                logger.warning(f"Failed to store compound model response: {storage_error}")
-                        
-                        return  # Exit early since we used compound model successfully
+                    if extraction_result.get("success"):
+                        website_data = {
+                            "urls_detected": extraction_result.get("urls_analyzed", []),
+                            "website_content": extraction_result.get("extracted_content", ""),
+                            "extraction_method": "groq_compound",
+                            "content_length": extraction_result.get("content_length", 0)
+                        }
+                        logger.info(f"Successfully extracted website data ({website_data['content_length']} characters)")
+                        yield f"✅ Website analysis complete. Processing with {model_id}...\n\n"
                     else:
-                        logger.warning("Compound model returned empty response, falling back to regular processing")
-                        yield "🔄 Switching to regular AI model for better response...\n\n"
+                        error_msg = extraction_result.get("error", "Unknown error")
+                        logger.warning(f"Website extraction failed: {error_msg}")
+                        yield f"⚠️ Website analysis had issues: {error_msg}\n\n"
+                        yield f"Proceeding with {model_id} using available information...\n\n"
                     
                 except Exception as compound_error:
                     logger.error(f"Groq compound model failed: {compound_error}")
-                    # Fall back to regular processing
-                    yield f"⚠️ URL processing encountered an issue, using regular AI model instead...\n\n"
+                    yield f"⚠️ Website analysis encountered an issue: {str(compound_error)}\n\n"
+                    yield f"Proceeding with {model_id} using available information...\n\n"
             
             # Analyze message for external data needs with intelligent context detection
             enhanced_context = await self._get_enhanced_context(message, user_context)
+            
+            # Add website data to enhanced context if available
+            if website_data:
+                enhanced_context["website_analysis"] = website_data
+                logger.info("Added website data to enhanced context")
+            
             context_fetch_time = (time.time() - context_fetch_start) * 1000  # Convert to milliseconds
             
             # Build system message with enhanced context and user information
@@ -196,8 +187,18 @@ class EnhancedChatService:
             # Store AI response and cache the conversation if we have an ID
             assistant_message_id = None
             if conversation_id:
+                # Add hybrid model info to context if website data was used
+                storage_context = enhanced_context.copy()
+                if website_data:
+                    storage_context["hybrid_approach"] = {
+                        "primary_model": model_id,
+                        "data_extraction_model": "groq/compound",
+                        "urls_analyzed": website_data.get("urls_detected", []),
+                        "extraction_success": True
+                    }
+                
                 assistant_message_id = await self._store_ai_response(
-                    conversation_id, response_content, model_id, enhanced_context, user_context
+                    conversation_id, response_content, model_id, storage_context, user_context
                 )
                 await self._cache_conversation_message(
                     conversation_id, message, response_content, model_id, enhanced_context, user_context
@@ -594,6 +595,23 @@ AVOID:
                                 change = loser.get("change", 0)
                                 context_sections.append(f"  {symbol}: {change:.2f}%")
         
+        # Website analysis context (from Groq compound model)
+        website_analysis = self.safe_data.safe_dict(context.get("website_analysis", {}))
+        if website_analysis and "website_content" in website_analysis:
+            urls_detected = self.safe_data.safe_list(website_analysis.get("urls_detected", []))
+            website_content = self.safe_data.safe_string(website_analysis.get("website_content", ""))
+            
+            if website_content and urls_detected:
+                context_sections.append(f"\n=== WEBSITE ANALYSIS (via Groq Compound Model) ===")
+                context_sections.append(f"URLs Analyzed: {', '.join(urls_detected)}")
+                context_sections.append("")
+                context_sections.append("Website Content Summary:")
+                context_sections.append(website_content)
+                context_sections.append("")
+                context_sections.append("IMPORTANT: Use this website content to answer the user's question accurately.")
+                context_sections.append("The user asked about this specific webpage, so prioritize this information.")
+                context_sections.append("")
+
         # News context
         news_data = self.safe_data.safe_dict(context.get("news", {}))
         if news_data and "results" in news_data:

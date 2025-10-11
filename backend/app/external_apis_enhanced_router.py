@@ -437,12 +437,34 @@ async def analyze_url_with_compound(
         raise HTTPException(status_code=500, detail=f"URL analysis error: {str(e)}")
 
 
+@router.post("/groq-compound/extract-website-data")
+async def extract_website_data(
+    message: str = Query(..., description="Message containing URLs to extract data from"),
+    urls: Optional[List[str]] = Query(None, description="Specific URLs to analyze (optional)")
+) -> Dict[str, Any]:
+    """Extract website data using Groq compound model for use by other AI models."""
+    try:
+        if not groq_compound_service.is_available():
+            raise HTTPException(status_code=503, detail="Groq compound model service not available")
+        
+        # Extract website data
+        result = await groq_compound_service.extract_website_data(message, urls)
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Website data extraction error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Extraction error: {str(e)}")
+
+
 @router.post("/groq-compound/chat-with-urls")
 async def chat_with_urls(
     message: str = Query(..., description="Message that may contain URLs"),
     conversation_history: Optional[List[Dict[str, str]]] = None
 ) -> Dict[str, Any]:
-    """Chat with Groq compound model, automatically detecting and processing URLs."""
+    """Chat with Groq compound model, automatically detecting and processing URLs (Legacy endpoint)."""
     try:
         if not groq_compound_service.is_available():
             raise HTTPException(status_code=503, detail="Groq compound model service not available")
@@ -456,7 +478,8 @@ async def chat_with_urls(
                 "message": message,
                 "should_use_compound": False,
                 "detected_urls": detected_urls,
-                "response": "No URLs detected or compound model not needed for this query."
+                "response": "No URLs detected or compound model not needed for this query.",
+                "note": "Consider using the hybrid approach via /api/chat/conversations endpoint"
             }
         
         # Generate response using compound model
@@ -473,7 +496,8 @@ async def chat_with_urls(
             "should_use_compound": True,
             "detected_urls": detected_urls,
             "response": response_content,
-            "model": groq_compound_service.compound_model
+            "model": groq_compound_service.compound_model,
+            "note": "This is direct compound model usage. Consider using hybrid approach for better results."
         }
         
     except HTTPException:
@@ -496,6 +520,71 @@ async def test_groq_compound(
         raise HTTPException(status_code=500, detail=f"Test error: {str(e)}")
 
 
+@router.post("/groq-compound/hybrid-chat")
+async def hybrid_chat(
+    message: str = Query(..., description="User message"),
+    primary_model: str = Query("openai/gpt-oss-120b", description="Primary AI model to use for response"),
+    conversation_history: Optional[List[Dict[str, str]]] = None,
+    user_context: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
+    """
+    Hybrid approach: Use Groq compound for website data extraction + Primary AI model for response.
+    This is the recommended way to handle URL-based queries.
+    """
+    try:
+        from app.enhanced_chat_service import EnhancedChatService
+        
+        chat_service = EnhancedChatService()
+        
+        # Set default user context
+        if not user_context:
+            user_context = {
+                "user_id": "api_user",
+                "username": "api_user", 
+                "is_authenticated": True
+            }
+        
+        # Generate response using hybrid approach
+        response_content = ""
+        metadata = {
+            "primary_model": primary_model,
+            "used_compound_for_data": False,
+            "urls_detected": [],
+            "processing_steps": []
+        }
+        
+        async for chunk in chat_service.generate_ai_response(
+            message=message,
+            model_id=primary_model,
+            conversation_history=conversation_history,
+            user_context=user_context
+        ):
+            response_content += chunk
+            
+            # Track processing steps
+            if "🌐" in chunk:
+                metadata["used_compound_for_data"] = True
+                metadata["processing_steps"].append("website_analysis_started")
+            elif "✅ Website analysis complete" in chunk:
+                metadata["processing_steps"].append("website_analysis_completed")
+        
+        # Detect URLs for metadata
+        urls = groq_compound_service.detect_urls_in_message(message)
+        metadata["urls_detected"] = urls
+        
+        return {
+            "message": message,
+            "response": response_content,
+            "metadata": metadata,
+            "approach": "hybrid",
+            "success": True
+        }
+        
+    except Exception as e:
+        logger.error(f"Hybrid chat error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Hybrid chat error: {str(e)}")
+
+
 @router.get("/groq-compound/detect-urls")
 async def detect_urls_in_text(
     text: str = Query(..., description="Text to analyze for URLs")
@@ -509,7 +598,8 @@ async def detect_urls_in_text(
             "text": text,
             "detected_urls": urls,
             "should_use_compound": should_use_compound,
-            "url_count": len(urls)
+            "url_count": len(urls),
+            "recommendation": "Use /hybrid-chat endpoint for best results with URLs"
         }
         
     except Exception as e:

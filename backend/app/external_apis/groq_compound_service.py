@@ -163,13 +163,37 @@ class GroqCompoundService:
         # Prepare messages for the compound model
         messages = []
         
-        # Add system message if provided, or use default
+        # Add system message if provided, or use default for data extraction
         if system_message:
             messages.append({"role": "system", "content": system_message})
         else:
-            default_system = """You are an AI assistant with the ability to visit and analyze websites. 
-When a user provides URLs, visit them and provide comprehensive summaries and analysis of their content.
-Be thorough but concise, and highlight the most important information from the websites."""
+            default_system = """You are a specialized web content extraction assistant. Your job is to visit websites and extract key information for analysis by other AI systems.
+
+IMPORTANT INSTRUCTIONS:
+1. Visit the provided URLs and extract the main content
+2. Focus on factual information, key points, and important details
+3. Organize the information clearly with headings and bullet points
+4. Include relevant data, statistics, quotes, and examples
+5. Maintain objectivity - don't add opinions or interpretations
+6. Structure the output for easy consumption by other AI systems
+
+FORMAT YOUR RESPONSE AS:
+**Website Title/Topic**
+• Key Point 1
+• Key Point 2
+• Key Point 3
+
+**Main Content Summary**
+[Detailed summary of the main content]
+
+**Important Details**
+• Specific data, dates, numbers
+• Key quotes or statements
+• Technical specifications (if applicable)
+
+**Additional Information**
+• Related topics mentioned
+• Links to other resources (if relevant)"""
             messages.append({"role": "system", "content": default_system})
         
         # Add conversation history
@@ -338,6 +362,74 @@ Be thorough but concise, and highlight the most important information from the w
         else:
             return f"Unexpected error with Groq compound model: {str(exception)}"
     
+    async def extract_website_data(
+        self,
+        message: str,
+        urls: List[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Extract data from websites for use by other AI models.
+        
+        Args:
+            message: Original user message
+            urls: List of URLs to analyze (optional, will detect if not provided)
+            
+        Returns:
+            Dictionary with extracted website data
+        """
+        try:
+            if not self.is_available():
+                return {"error": "Groq compound service not available", "success": False}
+            
+            # Detect URLs if not provided
+            if not urls:
+                urls = self.detect_urls_in_message(message)
+            
+            if not urls:
+                return {"error": "No URLs found to analyze", "success": False}
+            
+            # Create extraction prompt
+            extraction_prompt = f"""Please visit and extract key information from the following URLs for analysis:
+
+URLs to analyze: {', '.join(urls)}
+
+Original user request: {message}
+
+Extract the most relevant information that would help answer the user's question. Focus on facts, data, and key points."""
+            
+            # Extract website content
+            extracted_content = ""
+            async for chunk in self.generate_response_with_urls(
+                message=extraction_prompt,
+                stream=True,
+                temperature=0.2,  # Low temperature for factual extraction
+                max_tokens=3000
+            ):
+                extracted_content += chunk
+            
+            if extracted_content and len(extracted_content.strip()) > 50:
+                return {
+                    "success": True,
+                    "urls_analyzed": urls,
+                    "extracted_content": extracted_content,
+                    "content_length": len(extracted_content),
+                    "extraction_method": "groq_compound"
+                }
+            else:
+                return {
+                    "error": "Failed to extract meaningful content from websites",
+                    "success": False,
+                    "urls_attempted": urls
+                }
+                
+        except Exception as e:
+            logger.error(f"Error in extract_website_data: {e}")
+            return {
+                "error": str(e),
+                "success": False,
+                "urls_attempted": urls or []
+            }
+
     async def test_compound_model(self, test_url: str = "https://groq.com") -> Dict[str, Any]:
         """
         Test the compound model with a simple URL.

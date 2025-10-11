@@ -27,9 +27,11 @@ export default function TestCompoundModelPage() {
   const [message, setMessage] = useState("");
   const [testUrl, setTestUrl] = useState("https://groq.com/blog/inside-the-lpu-deconstructing-groq-speed");
   const [question, setQuestion] = useState("");
+  const [primaryModel, setPrimaryModel] = useState("openai/gpt-oss-120b");
   const [loading, setLoading] = useState(false);
   const [response, setResponse] = useState<CompoundResponse | null>(null);
   const [urlAnalysis, setUrlAnalysis] = useState<UrlAnalysisResponse | null>(null);
+  const [hybridResponse, setHybridResponse] = useState<unknown>(null);
   const [status, setStatus] = useState<{
     available: boolean;
     model: string;
@@ -52,6 +54,39 @@ export default function TestCompoundModelPage() {
       setStatus(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to check status");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const testHybridApproach = async () => {
+    if (!message.trim()) return;
+    
+    try {
+      setLoading(true);
+      setError(null);
+      setHybridResponse(null);
+      
+      const params = new URLSearchParams({
+        message: message.trim(),
+        primary_model: primaryModel
+      });
+      
+      const res = await fetch(`/api/v1/external/groq-compound/hybrid-chat?${params}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        }
+      });
+      
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+      }
+      
+      const data = await res.json();
+      setHybridResponse(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to process hybrid request");
     } finally {
       setLoading(false);
     }
@@ -170,27 +205,93 @@ export default function TestCompoundModelPage() {
         </CardContent>
       </Card>
 
-      {/* Chat with URLs */}
+      {/* Hybrid Approach */}
       <Card className="mb-6">
         <CardHeader>
-          <CardTitle>Chat with URLs</CardTitle>
+          <CardTitle>Hybrid Approach (Recommended)</CardTitle>
           <CardDescription>
-            Send a message that contains URLs to test automatic compound model detection
+            Use Groq compound for website data + Your chosen AI model for response
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <Textarea
-            placeholder="Enter a message with URLs (e.g., 'Analyze this page: https://groq.com')"
+            placeholder="Enter a message with URLs (e.g., 'What are the key points in this article: https://groq.com/blog/...')"
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             rows={3}
           />
           
-          <Button onClick={testChatWithUrls} disabled={loading || !message.trim()}>
+          <div className="flex items-center space-x-4">
+            <label className="text-sm font-medium">Primary AI Model:</label>
+            <select 
+              value={primaryModel} 
+              onChange={(e) => setPrimaryModel(e.target.value)}
+              className="border rounded px-3 py-1"
+            >
+              <option value="openai/gpt-oss-120b">GPT OSS 120B (Default)</option>
+              <option value="gpt-4o">GPT-4o</option>
+              <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet</option>
+              <option value="llama-3.1-70b-versatile">Llama 3.1 70B</option>
+            </select>
+          </div>
+          
+          <Button onClick={testHybridApproach} disabled={loading || !message.trim()}>
             {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-            Send Message
+            Test Hybrid Approach
           </Button>
           
+          {hybridResponse && (
+            <div className="space-y-4 p-4 bg-muted rounded-lg">
+              <div className="flex items-center gap-2">
+                <Badge variant="default">
+                  Hybrid Approach
+                </Badge>
+                <span className="text-sm text-muted-foreground">
+                  Primary: {hybridResponse.metadata?.primary_model}
+                </span>
+                {hybridResponse.metadata?.used_compound_for_data && (
+                  <Badge variant="outline">+ Groq Compound</Badge>
+                )}
+              </div>
+              
+              {hybridResponse.metadata?.urls_detected?.length > 0 && (
+                <div>
+                  <h4 className="font-semibold mb-2">URLs Analyzed:</h4>
+                  <ul className="space-y-1">
+                    {hybridResponse.metadata.urls_detected.map((url: string, index: number) => (
+                      <li key={index} className="flex items-center gap-2 text-sm">
+                        <ExternalLink className="h-3 w-3" />
+                        <a href={url} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">
+                          {url}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              
+              {hybridResponse.metadata?.processing_steps?.length > 0 && (
+                <div>
+                  <h4 className="font-semibold mb-2">Processing Steps:</h4>
+                  <ul className="space-y-1">
+                    {hybridResponse.metadata.processing_steps.map((step: string, index: number) => (
+                      <li key={index} className="text-sm">
+                        • {step.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              
+              <div>
+                <h4 className="font-semibold mb-2">Final Response:</h4>
+                <div className="whitespace-pre-wrap text-sm bg-background p-3 rounded border">
+                  {hybridResponse.response}
+                </div>
+              </div>
+            </div>
+          )}
+
           {response && (
             <div className="space-y-4 p-4 bg-muted rounded-lg">
               <div className="flex items-center gap-2">
@@ -200,6 +301,9 @@ export default function TestCompoundModelPage() {
                 <span className="text-sm text-muted-foreground">
                   Model: {response.model}
                 </span>
+                {response.note && (
+                  <Badge variant="outline">Legacy</Badge>
+                )}
               </div>
               
               {response.detected_urls.length > 0 && (
@@ -224,8 +328,37 @@ export default function TestCompoundModelPage() {
                   {response.response}
                 </div>
               </div>
+              
+              {response.note && (
+                <div className="text-sm text-muted-foreground p-2 bg-yellow-50 rounded border">
+                  💡 {response.note}
+                </div>
+              )}
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Legacy Chat with URLs */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Legacy: Direct Compound Model</CardTitle>
+          <CardDescription>
+            Test direct compound model usage (not recommended for production)
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Textarea
+            placeholder="Enter a message with URLs for legacy testing"
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            rows={2}
+          />
+          
+          <Button onClick={testChatWithUrls} disabled={loading || !message.trim()} variant="outline">
+            {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+            Test Legacy Approach
+          </Button>
         </CardContent>
       </Card>
 

@@ -30,6 +30,8 @@ We believe great AI platforms are built at the intersection of three principles:
 
 **Context-Aware Enhancement** - Detects when queries need external data and seamlessly enriches responses with real-time web search, cryptocurrency data, or vector database retrieval.
 
+**Hybrid AI Approach** - Automatically detects URLs in user messages and uses Groq's compound model to extract website data, then passes this information to the user's chosen primary AI model for intelligent analysis and response generation.
+
 **Graceful Degradation** - Built-in fallback mechanisms ensure the platform remains functional even when external providers are unavailable. Mock responses for development, automatic provider failover for production.
 
 ### Production-Grade Architecture
@@ -220,6 +222,14 @@ The platform automatically selects the optimal model based on:
 - Snowflake Arctic embeddings
 - Document ingestion and retrieval
 
+**Hybrid AI System (URL Analysis)**
+
+- Automatic URL detection in user messages
+- Groq compound model for website data extraction
+- User's chosen primary AI model for response generation
+- Best of both worlds: specialized web browsing + preferred AI model
+- Seamless integration with regular chat flow
+
 ## 📊 API Reference
 
 ### Core Endpoints
@@ -243,6 +253,13 @@ WS   /api/chat/ws/{id}       # WebSocket streaming
 # External Data
 GET  /api/external/search     # Web search
 GET  /api/external/crypto/prices  # Crypto prices
+
+# Hybrid AI System
+GET  /api/v1/external/groq-compound/status  # Service status
+POST /api/v1/external/groq-compound/hybrid-chat  # Recommended: Hybrid approach
+POST /api/v1/external/groq-compound/extract-website-data  # Extract website data
+POST /api/v1/external/groq-compound/analyze-url  # Analyze specific URL
+GET  /api/v1/external/groq-compound/detect-urls  # URL detection utility
 
 # Vector Database
 POST /api/vector/documents    # Add document
@@ -284,6 +301,40 @@ ws.send(
     tools: ["web_search", "crypto_data"],
   })
 );
+```
+
+### Hybrid AI System Usage
+
+```javascript
+// Recommended: Hybrid approach (Compound for data + Your chosen AI for response)
+const response = await fetch(
+  "/api/v1/external/groq-compound/hybrid-chat?" +
+    new URLSearchParams({
+      message:
+        "What are the key points in this article: https://groq.com/blog/inside-the-lpu-deconstructing-groq-speed",
+      primary_model: "gpt-4o", // Your preferred AI model
+    }),
+  { method: "POST" }
+);
+
+const data = await response.json();
+console.log(data.metadata.primary_model); // "gpt-4o"
+console.log(data.metadata.used_compound_for_data); // true
+console.log(data.metadata.urls_detected); // ["https://groq.com/blog/..."]
+console.log(data.response); // Intelligent response from your chosen AI
+
+// Extract website data only (for custom processing)
+const extraction = await fetch(
+  "/api/v1/external/groq-compound/extract-website-data?" +
+    new URLSearchParams({
+      message: "Extract data from: https://groq.com",
+    }),
+  { method: "POST" }
+);
+
+const extractedData = await extraction.json();
+console.log(extractedData.extracted_content); // Raw website data
+// Then process with your preferred AI model
 ```
 
 ## 🛠️ Technology Stack
